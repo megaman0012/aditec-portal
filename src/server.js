@@ -5,6 +5,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config, validar, describe } from './config.js';
+import { crearSincronizador } from './sync/scheduler.js';
 
 const VERSION = '0.1.0';
 
@@ -79,14 +80,19 @@ if (errores.length) {
   process.exit(1);
 }
 
+// Sincronizador: corre en segundo plano, independiente de las peticiones web.
+const sincronizador = crearSincronizador(config);
+
 server.listen(config.port, () => {
   console.log(`[aditec-portal] v${VERSION} escuchando en :${config.port}`);
   console.log('[aditec-portal] config:', JSON.stringify(describe(config)));
+  sincronizador.iniciar();
 });
 
 for (const sig of ['SIGTERM', 'SIGINT']) {
   process.on(sig, () => {
     console.log(`[aditec-portal] ${sig} recibido, cerrando...`);
+    sincronizador.detener();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 5000).unref();
   });

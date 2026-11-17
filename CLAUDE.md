@@ -60,6 +60,12 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
 - Chart.js v4.4.7, sha256 `2812cb8825fdc57469eb2f7bb055e9429244e599920511ee477e828499b632cb`
   (el bundle `chart.umd.js` de 4.4.7 ya viene minificado; se guardó como `chart.umd.min.js`).
 
+- Sincronizador apagado salvo `SYNC_ACTIVO=true` en .env. Lock `data/mba3.lock` + `data/mba3-ultima.json`
+  garantizan una petición a la vez y la pausa también entre procesos (servidor y scripts).
+- Detención persistente en `data/SYNC_DETENIDO.json`: 3 respuestas raras seguidas, o al instante con
+  `{"error":"003","respuesta":"IP No Autorizada"}`. Nada vuelve a llamar a MBA3 hasta `sync-manual.js --reanudar`.
+- 2026-11-17: primera prueba real -> error 003 "IP No Autorizada" para 192.168.1.50 (1 sola petición).
+
 ## Comandos
 - `docker compose up -d --build` · `docker compose logs -f portal` · `curl localhost:8090/health`
 - Tests: `docker run --rm -v "$PWD":/app:Z -w /app node:20-alpine node --test test/`

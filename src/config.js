@@ -43,6 +43,8 @@ export function cargarConfig(env = process.env) {
       limit: int(env, 'MBA3_LIMIT', 5000),
     },
     sync: {
+      // Interruptor general: el sincronizador solo arranca con SYNC_ACTIVO=true.
+      activo: String(env.SYNC_ACTIVO ?? '').toLowerCase() === 'true',
       mesActualMin: int(env, 'SYNC_MES_ACTUAL_MIN', 30),
       historiaDesde: env.SYNC_HISTORIA_DESDE || '2025-01-01',
     },
