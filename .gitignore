@@ -1,0 +1,14 @@
+# Secretos
+.env
+.env.*
+!.env.example
+
+# Caché y datos de ejecución
+data/*
+!data/.gitkeep
+
+# Usuarios del portal (hashes): no se versionan
+config/usuarios.json
+
+node_modules/
+*.log

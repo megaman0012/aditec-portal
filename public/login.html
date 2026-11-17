@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal ADITEC — Ingreso</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="login">
+  <form class="tarjeta" id="form-login" method="post" action="/api/login" autocomplete="on">
+    <img src="/img/logo.svg" alt="ADITEC" class="logo">
+    <h1>Portal ADITEC</h1>
+    <label>Usuario <input name="usuario" autocomplete="username" required></label>
+    <label>Contraseña <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit" disabled>Ingresar</button>
+    <p class="muted">El ingreso se habilita en la Fase 5.</p>
+  </form>
+</body>
+</html>

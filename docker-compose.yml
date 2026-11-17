@@ -1,0 +1,33 @@
+name: aditec-portal
+
+services:
+  portal:
+    build: .
+    image: aditec-portal:0.1.0
+    container_name: aditec-portal
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8090:8090"
+    volumes:
+      # :Z = etiqueta SELinux privada (host en Enforcing)
+      - ./data:/app/data:Z
+      - ./config:/app/config:ro,Z
+    networks:
+      - aditec-net
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  aditec-net:
+    external: true

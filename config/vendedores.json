@@ -1,0 +1,6 @@
+{
+  "_comentario": "Catálogo de asesores para el tablero. Solo código, nombre visible y sucursal. SIN cédulas ni datos personales. Se completa en Fase 4 con los códigos reales de VENDEDOR / COD_SALESMAN.",
+  "vendedores": [
+    { "codigo": "EJEMPLO", "nombre": "Asesor de ejemplo", "sucursal": "MATRIZ", "activo": false }
+  ]
+}

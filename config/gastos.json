@@ -1,0 +1,9 @@
+{
+  "_comentario": "Clasificación de cuentas contables (CONT_Asiento_Detalle.GL_ACCOUNT_CODE) en Gastos de nómina (GN) y Gastos generales (GG), y cómo se asignan a cada asesor (DEPARTMENT_CODE / PROFIT_CENTER_CODE). Se define y valida en Fase 4.",
+  "nomina": [],
+  "generales": [],
+  "asignacion": {
+    "por": "PENDIENTE",
+    "mapa": {}
+  }
+}
