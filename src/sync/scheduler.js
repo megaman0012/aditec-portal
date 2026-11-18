@@ -1,20 +1,25 @@
 // Sincronizador en segundo plano — ÚNICO componente que habla con MBA3.
 //
-// - Historia: desde SYNC_HISTORIA_DESDE, mes a mes; los meses cerrados ya en caché no se re-consultan
-//   (el mes anterior se refresca hasta el día 10 del mes en curso por ajustes tardíos).
-// - Mes en curso: cada SYNC_MES_ACTUAL_MIN minutos.
-// - Caché atómica: data/cache/<tabla>/<AAAA-MM>.json (archivo temporal + rename).
-// - Estado: data/estado-sync.json (lo leerá la web).
-// - Si el cliente se detiene por respuestas raras repetidas: se escribe data/SYNC_DETENIDO.json, se
-//   avisa en el log y NO se reintenta hasta que un humano lo reanude (scripts/sync-manual.js --reanudar).
+// Unidad = MES. Por cada mes se consultan (en serie) facturas, movimientos y asientos, se AGREGAN
+// por vendedor/día (src/calc/agregar.js) y se escribe data/cache/AAAA-MM.json de forma atómica.
+// No se guardan filas crudas (salvo `guardarCrudo` para exploración, en data/exploracion/crudo/).
+//
+// - Mes en curso: se refresca en cada pasada (cada SYNC_MES_ACTUAL_MIN minutos).
+// - Meses cerrados: se descargan una vez y quedan fijos; "recargar mes" fuerza una nueva descarga.
+// - Historia faltante desde SYNC_HISTORIA_DESDE: de lo más reciente a lo más antiguo.
+// - Estado: data/estado.json (último sync por mes, peticiones, errores, duración).
+// - Respuestas raras repetidas o IP no autorizada: data/SYNC_DETENIDO.json y no se vuelve a llamar
+//   a MBA3 hasta `scripts/sync-manual.js --reanudar`.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { Mba3Client } from '../mba3/client.js';
 import { consultarRango, mesesEntre, rangoDeMes } from '../mba3/queries.js';
+import { agregarMes } from '../calc/agregar.js';
 
-const MAX_ERRORES_GUARDADOS = 20;
-const DIA_LIMITE_MES_ANTERIOR = 10;
+const MAX_ERRORES_GUARDADOS = 30;
+const VERSION_CACHE = 1;
+export const TABLAS_MES = ['facturas', 'movimientos', 'asientos'];
 
 export function escribirJsonAtomico(file, obj) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -34,33 +39,23 @@ export function hoyEn(tz, ahora = new Date()) {
 
 export function rutasCache(dataDir) {
   return {
-    cache: (tabla, mes) => path.join(dataDir, 'cache', tabla, `${mes}.json`),
-    estado: path.join(dataDir, 'estado-sync.json'),
+    mes: (mes) => path.join(dataDir, 'cache', `${mes}.json`),
+    crudo: (tabla, mes) => path.join(dataDir, 'exploracion', 'crudo', `${tabla}-${mes}.json`),
+    estado: path.join(dataDir, 'estado.json'),
     detenido: path.join(dataDir, 'SYNC_DETENIDO.json'),
   };
 }
 
-// Tablas a sincronizar: asientos en cuanto gastos.json tenga prefijos (aunque no esté confirmado,
-// así los datos están listos el día que se confirme).
-export function tablasActivas(cfg) {
-  const t = ['facturas', 'movimientos'];
-  const g = cfg.gastos ?? {};
-  if ((g.nomina_prefijos?.length ?? 0) + (g.generales_prefijos?.length ?? 0) > 0) t.push('asientos');
-  return t;
-}
-
 /**
- * Decide qué meses consultar en una pasada.
- * - Meses sin caché (historia pendiente).
- * - El mes en curso siempre.
- * - El mes anterior si hoy es día <= 10.
+ * Plan de una pasada automática: primero el mes en curso, luego los meses cerrados que falten,
+ * del más reciente al más antiguo.
  */
-export function mesesPendientes({ historiaDesde, hoy, existe }) {
+export function planDePasada({ historiaDesde, hoy, existe }) {
   const mesActual = hoy.slice(0, 7);
-  const todos = mesesEntre(historiaDesde, hoy);
-  const anterior = todos.at(-2);
-  const dia = Number(hoy.slice(8, 10));
-  return todos.filter((mes) => mes === mesActual || (mes === anterior && dia <= DIA_LIMITE_MES_ANTERIOR) || !existe(mes));
+  const cerradosFaltantes = mesesEntre(historiaDesde, hoy)
+    .filter((m) => m !== mesActual && !existe(m))
+    .reverse();
+  return [mesActual, ...cerradosFaltantes];
 }
 
 export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
@@ -71,12 +66,7 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
   let cliente = null;
 
   const estado = leerJson(rutas.estado, null) ?? {
-    estado: 'nuevo',
-    ultimaPasadaInicio: null,
-    ultimaPasadaFin: null,
-    ultimaPasadaOk: null,
-    meses: {},
-    errores: [],
+    estado: 'nuevo', peticionesTotales: 0, meses: {}, errores: [], ultimaPasada: null,
   };
 
   function guardarEstado(cambios = {}) {
@@ -102,12 +92,8 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
   function obtenerCliente() {
     if (cliente) return cliente;
     const opciones = {
-      base: cfg.mba3.base,
-      codigo: cfg.mba3.codigo,
-      pwd: cfg.mba3.pwd,
-      pausaMs: cfg.mba3.pausaMs,
-      renovarMs: cfg.mba3.renovarMs,
-      dataDir: cfg.dataDir,
+      base: cfg.mba3.base, codigo: cfg.mba3.codigo, pwd: cfg.mba3.pwd,
+      pausaMs: cfg.mba3.pausaMs, renovarMs: cfg.mba3.renovarMs, dataDir: cfg.dataDir,
       alEvento: (e) => {
         if (e.tipo === 'respuesta-rara') log.warn(`[sync] respuesta rara ${e.n}/3: ${e.detalle}`);
         if (e.tipo === 'reintento-unauthorized') log.warn(`[sync] Unauthorized en ${e.from}: renovando sesión y reintentando 1 vez`);
@@ -117,66 +103,87 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     return cliente;
   }
 
+  // Descarga y agrega UN mes. Lanza si falla alguna tabla (el archivo anterior, si existe, se conserva).
+  async function sincronizarMes(c, mes, hoy, { guardarCrudo = false } = {}) {
+    const t0 = Date.now();
+    const p0 = c.peticiones;
+    const r = rangoDeMes(mes);
+    const hasta = r.hasta > hoy ? hoy : r.hasta;
+    const crudo = {};
+    for (const tabla of TABLAS_MES) {
+      crudo[tabla] = await consultarRango(c, {
+        tabla, empresa: cfg.mba3.empresa, desde: r.desde, hasta, limit: cfg.mba3.limit,
+        alPartir: (p) => log.log(`[sync]   ${tabla} ${p.desde}..${p.hasta} llegó al tope; partiendo en ${p.mitad}`),
+      });
+      if (guardarCrudo) escribirJsonAtomico(rutas.crudo(tabla, mes), { tabla, mes, filas: crudo[tabla] });
+    }
+    const agg = agregarMes({ mes, ...crudo });
+    const mesActual = hoy.slice(0, 7);
+    const info = {
+      version: VERSION_CACHE,
+      mes, desde: r.desde, hasta,
+      cerrado: mes < mesActual,
+      generado: new Date().toISOString(),
+      peticiones: c.peticiones - p0,
+      duracionMs: Date.now() - t0,
+      conteo: agg.conteo,
+      descartes: agg.descartes,
+    };
+    escribirJsonAtomico(rutas.mes(mes), { ...info, cuentas: agg.cuentas, filas: agg.filas, pool: agg.pool });
+    return info;
+  }
+
   /**
-   * Una pasada de sincronización (serial). Si se pasan desde/hasta, sincroniza esos meses aunque
-   * ya estén en caché (uso manual).
+   * Una pasada (serial).
+   * @param {{meses?:string[]}} [o]  meses explícitos (recargar/forzar). Sin meses: plan automático.
    */
-  async function pasada({ desde, hasta, tablas } = {}) {
+  async function pasada({ meses, guardarCrudo = false } = {}) {
     if (corriendo) return { omitida: 'ya hay una pasada en curso' };
     if (fs.existsSync(rutas.detenido)) return { omitida: 'sincronizador detenido (SYNC_DETENIDO.json)' };
     corriendo = true;
     const c = obtenerCliente();
     const hoy = hoyEn(cfg.tz);
-    const lista = tablas ?? tablasActivas(cfg);
-    const meses = desde
-      ? mesesEntre(desde, hasta ?? hoy)
-      : mesesPendientes({ historiaDesde: cfg.sync.historiaDesde, hoy, existe: (mes) => lista.every((t) => fs.existsSync(rutas.cache(t, mes))) });
-    const resumen = { meses: meses.length, consultas: 0, filas: 0, errores: 0 };
-    guardarEstado({ estado: 'sincronizando', ultimaPasadaInicio: new Date().toISOString() });
-    log.log(`[sync] pasada: ${meses.length} mes(es) × ${lista.length} tabla(s) [${lista.join(', ')}]`);
+    const plan = meses ?? planDePasada({ historiaDesde: cfg.sync.historiaDesde, hoy, existe: (m) => fs.existsSync(rutas.mes(m)) });
+    const t0 = Date.now();
+    const p0 = c.peticiones;
+    const resumen = { meses: plan.length, ok: 0, errores: 0, peticiones: 0, duracionMs: 0 };
+    guardarEstado({ estado: 'sincronizando', pasadaInicio: new Date().toISOString(), plan });
+    log.log(`[sync] pasada: ${plan.length} mes(es): ${plan.join(', ')}`);
 
     try {
       c.tomarLock('sincronizador');
-      for (const mes of meses) {
-        for (const tabla of lista) {
-          if (parado) break;
-          const r = rangoDeMes(mes);
-          const hasta2 = r.hasta > hoy ? hoy : r.hasta;
-          try {
-            const filas = await consultarRango(c, {
-              tabla, empresa: cfg.mba3.empresa, desde: r.desde, hasta: hasta2, limit: cfg.mba3.limit,
-              alPartir: (p) => log.log(`[sync] ${tabla} ${p.desde}..${p.hasta} llegó al límite; partiendo en ${p.mitad}`),
-            });
-            escribirJsonAtomico(rutas.cache(tabla, mes), {
-              tabla, mes, desde: r.desde, hasta: hasta2, sincronizado: new Date().toISOString(), filas,
-            });
-            estado.meses[`${tabla}:${mes}`] = { filas: filas.length, sincronizado: new Date().toISOString() };
-            resumen.consultas++;
-            resumen.filas += filas.length;
-            log.log(`[sync] ${tabla} ${mes}: ${filas.length} filas`);
-          } catch (e) {
-            resumen.errores++;
-            registrarError(`${tabla} ${mes}: ${e.message}`);
-            log.error(`[sync] ${tabla} ${mes}: ${e.message}`);
-            if (c.detenido) {
-              marcarDetenido(c.motivoDetencion);
-              return { ...resumen, detenido: true };
-            }
-            if (e.tipo === 'lock') throw e;
+      for (const mes of plan) {
+        if (parado) break;
+        try {
+          const info = await sincronizarMes(c, mes, hoy, { guardarCrudo });
+          estado.meses[mes] = { ...info, error: null };
+          estado.peticionesTotales = (estado.peticionesTotales ?? 0) + info.peticiones;
+          resumen.ok++;
+          log.log(`[sync] ${mes}: ${info.conteo.facturas} fact · ${info.conteo.movimientos} mov · ${info.conteo.asientos} asientos · ${info.peticiones} peticiones · ${(info.duracionMs / 1000).toFixed(1)} s`);
+        } catch (e) {
+          resumen.errores++;
+          estado.meses[mes] = { ...(estado.meses[mes] ?? {}), error: e.message, errorEn: new Date().toISOString() };
+          registrarError(`${mes}: ${e.message}`);
+          log.error(`[sync] ${mes}: ${e.message}`);
+          if (c.detenido) {
+            marcarDetenido(c.motivoDetencion);
+            return { ...resumen, detenido: true };
           }
-          guardarEstado();
+          if (e.tipo === 'lock') throw e;
         }
+        guardarEstado();
       }
+      resumen.peticiones = c.peticiones - p0;
+      resumen.duracionMs = Date.now() - t0;
       guardarEstado({
         estado: resumen.errores ? 'con-errores' : 'ok',
-        ultimaPasadaFin: new Date().toISOString(),
-        ...(resumen.errores ? {} : { ultimaPasadaOk: new Date().toISOString() }),
+        ultimaPasada: { fin: new Date().toISOString(), ...resumen },
       });
-      log.log(`[sync] pasada terminada: ${JSON.stringify(resumen)} · peticiones MBA3 acumuladas: ${c.peticiones}`);
+      log.log(`[sync] pasada terminada: ${JSON.stringify(resumen)}`);
       return resumen;
     } catch (e) {
       registrarError(e.message);
-      guardarEstado({ estado: 'error', ultimaPasadaFin: new Date().toISOString() });
+      guardarEstado({ estado: 'error' });
       log.error('[sync] pasada abortada:', e.message);
       return { ...resumen, error: e.message };
     } finally {
@@ -185,12 +192,18 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     }
   }
 
-  function programar() {
+  // Botón admin "recargar mes" (Fase 6 lo expone en la web).
+  function recargarMes(mes) {
+    if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error('Mes inválido');
+    return pasada({ meses: [mes] });
+  }
+
+  function programar(ms) {
     if (parado) return;
     timer = setTimeout(async () => {
       await pasada();
-      programar();
-    }, cfg.sync.mesActualMin * 60_000);
+      programar(cfg.sync.mesActualMin * 60_000);
+    }, ms);
     timer.unref?.();
   }
 
@@ -213,12 +226,7 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     }
     parado = false;
     log.log(`[sync] iniciado: historia desde ${cfg.sync.historiaDesde}, mes en curso cada ${cfg.sync.mesActualMin} min`);
-    // Primera pasada poco después de arrancar (no bloquea el servidor web).
-    timer = setTimeout(async () => {
-      await pasada();
-      programar();
-    }, 5_000);
-    timer.unref?.();
+    programar(5_000); // primera pasada poco después de arrancar (no bloquea la web)
     return true;
   }
 
@@ -228,7 +236,7 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     timer = null;
   }
 
-  return { iniciar, detener, pasada, estado: () => ({ ...estado }), rutas };
+  return { iniciar, detener, pasada, recargarMes, estado: () => ({ ...estado }), rutas, ocupado: () => corriendo };
 }
 
 export function reanudar(dataDir) {

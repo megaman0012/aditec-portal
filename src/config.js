@@ -3,6 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { UMBRALES_DEFECTO } from './calc/metrics.js';
 
 const PAUSA_MINIMA_MS = 1500; // piso duro anti-veto de IP
 
@@ -19,6 +20,12 @@ function leerJson(dir, nombre, def) {
   } catch (err) {
     throw new Error(`config/${nombre} no es JSON válido: ${err.message}`);
   }
+}
+
+// Quita claves "_comentario" y similares (documentación dentro del JSON).
+function sinComentarios(o) {
+  if (!o || typeof o !== 'object') return o;
+  return Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('_')));
 }
 
 // vendedores.json: arreglo [{codigo, alias, nombre, sucursal, area, activo}] (formato Fase 4).
@@ -56,6 +63,8 @@ export function cargarConfig(env = process.env) {
     },
     vendedores: normalizarVendedores(leerJson(configDir, 'vendedores.json', [])),
     gastos: { confirmado: false, nomina_prefijos: [], generales_prefijos: [], excluir_prefijos: [], ...leerJson(configDir, 'gastos.json', {}) },
+    umbrales: sinComentarios(leerJson(configDir, 'umbrales.json', null)) ?? UMBRALES_DEFECTO,
+    reglas: { vb_ignorar_descuento_igual_valor_factura: false, ...sinComentarios(leerJson(configDir, 'reglas.json', {})) },
   };
   return cfg;
 }
@@ -73,6 +82,12 @@ export function validar(cfg) {
   if (!cfg.mba3.codigo || !cfg.mba3.pwd) avisos.push('MBA3_CODIGO/MBA3_PWD vacíos: sincronizador deshabilitado');
   if (!Array.isArray(cfg.vendedores)) errores.push('config/vendedores.json debe ser un arreglo de vendedores');
   else if (cfg.vendedores.some((v) => !v?.codigo)) errores.push('config/vendedores.json: todo vendedor necesita "codigo"');
+  for (const [k, u] of Object.entries(cfg.umbrales ?? {})) {
+    const ok = u && typeof u.campo === 'string' &&
+      ((Number.isFinite(u.verde_min) && Number.isFinite(u.amarillo_min) && u.verde_min >= u.amarillo_min) ||
+       (Number.isFinite(u.verde_max) && Number.isFinite(u.amarillo_max) && u.verde_max <= u.amarillo_max));
+    if (!ok) errores.push(`config/umbrales.json: "${k}" inválido (campo + verde_min>=amarillo_min o verde_max<=amarillo_max)`);
+  }
   const g = cfg.gastos;
   if (!Array.isArray(g.nomina_prefijos) || !Array.isArray(g.generales_prefijos)) {
     errores.push('config/gastos.json: nomina_prefijos y generales_prefijos deben ser arreglos');

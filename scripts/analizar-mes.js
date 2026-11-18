@@ -9,15 +9,16 @@ import { rutasCache } from '../src/sync/scheduler.js';
 
 const mes = process.argv[2];
 if (!/^\d{4}-\d{2}$/.test(mes ?? '')) salir('Uso: node scripts/analizar-mes.js AAAA-MM');
+// Lee las filas CRUDAS guardadas con: sync-manual.js --mes=AAAA-MM --crudo
 const rutas = rutasCache(config.dataDir);
 const leer = (t) => {
-  const f = rutas.cache(t, mes);
-  if (!fs.existsSync(f)) salir(`Falta caché ${t} ${mes}: ejecuta sync-manual primero`);
+  const f = rutas.crudo(t, mes);
+  if (!fs.existsSync(f)) salir(`Falta ${f}: ejecuta sync-manual.js --mes=${mes} --crudo primero`);
   return JSON.parse(fs.readFileSync(f, 'utf8')).filas;
 };
 const fact = leer('facturas');
 const mov = leer('movimientos');
-const asi = fs.existsSync(rutas.cache('asientos', mes)) ? leer('asientos') : [];
+const asi = leer('asientos');
 
 const r2 = (x) => Math.round(x * 100) / 100;
 const pct = (a, b) => (b ? r2(((a - b) / b) * 100) : null);

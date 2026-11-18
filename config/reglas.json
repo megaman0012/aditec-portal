@@ -1,0 +1,5 @@
+{
+  "_comentario": "Reglas de cálculo pendientes de decisión (Fase 4). Cambiar no requiere volver a descargar de MBA3.",
+  "vb_ignorar_descuento_igual_valor_factura": false,
+  "_vb_ignorar_descuento_igual_valor_factura": "En oct-2026, 42 facturas tienen VALOR_TOTAL_DESCUENTO == VALOR_FACTURA (MA-DG, MA-DO y devoluciones totales). true = no contarlo como descuento (baja VB y %D; VN no cambia)."
+}

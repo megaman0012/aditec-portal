@@ -70,3 +70,15 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
 - `docker compose up -d --build` · `docker compose logs -f portal` · `curl localhost:8090/health`
 - Tests: `docker run --rm -v "$PWD":/app:Z -w /app node:20-alpine node --test test/`
 - Crear usuario: `docker compose run --rm -it -v ./config:/app/config:Z portal node scripts/crear-usuario.js <usuario> "<Nombre>" [lector|admin]`
+
+## Motor de datos (Fase 5)
+- Caché por MES: `data/cache/AAAA-MM.json` = filas agregadas por día/vendedor
+  {fecha, vendedor, sucursal(ORIGEN), sub, desc, descAnomalo, dev, costo, gastoNomina, gastoGeneral, nFacturas}
+  + `pool` de gastos por día/dep/pc/cuenta. Sin facturas ni datos personales. Montos con 4 decimales.
+- gastoNomina/gastoGeneral quedan null en caché: el reparto se hace en `calcular()` sobre el rango pedido,
+  así cambiar `config/gastos.json` no exige volver a descargar.
+- Plan de pasada: mes en curso + meses cerrados faltantes (más reciente → más antiguo). Recargar: `sync-manual.js --mes=AAAA-MM`.
+- `data/estado.json`: por mes peticiones/duración/conteos/error; global peticionesTotales y última pasada.
+- `src/data/repo.js` es lo único que usa la web: lee caché, calcula periodo + mismo rango del año anterior.
+- `config/umbrales.json` (semáforo) y `config/reglas.json` (regla del descuento anómalo, apagada).
+- Un mes completo (oct-2026) = 10 peticiones, ~28 s.

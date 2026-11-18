@@ -1,0 +1,6 @@
+{
+  "_comentario": "Semáforo del tablero. Valores en proporción (0.15 = 15 %). Editables; reiniciar el contenedor para aplicar.",
+  "rentabilidad": { "campo": "run", "verde_min": 0.15, "amarillo_min": 0.05 },
+  "descuentos":   { "campo": "pctD", "verde_max": 0.03, "amarillo_max": 0.06 },
+  "costo":        { "campo": "pctC", "verde_max": 0.40, "amarillo_max": 0.50 }
+}
