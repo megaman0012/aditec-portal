@@ -189,13 +189,27 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     } finally {
       c.soltarLock();
       corriendo = false;
+      if (colaRecarga.length) setImmediate(procesarCola);
     }
   }
 
-  // Botón admin "recargar mes" (Fase 6 lo expone en la web).
+  // Botón admin "recargar mes": ENCOLA y vuelve de inmediato; la cola se procesa en serie
+  // cuando no hay otra pasada en curso (nunca en paralelo).
+  const colaRecarga = [];
   function recargarMes(mes) {
     if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error('Mes inválido');
-    return pasada({ meses: [mes] });
+    if (!cfg.mba3.codigo || !cfg.mba3.pwd) throw new Error('Sin credenciales MBA3');
+    if (fs.existsSync(rutas.detenido)) throw new Error('Sincronizador detenido: reanudar antes de recargar');
+    if (!colaRecarga.includes(mes)) colaRecarga.push(mes);
+    const posicion = colaRecarga.indexOf(mes) + 1;
+    setImmediate(procesarCola);
+    return { encolado: mes, posicion, enCurso: corriendo };
+  }
+  async function procesarCola() {
+    if (corriendo || !colaRecarga.length) return;
+    const meses = colaRecarga.splice(0);
+    log.log(`[sync] recarga solicitada: ${meses.join(', ')}`);
+    await pasada({ meses });
   }
 
   function programar(ms) {
@@ -236,7 +250,17 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     timer = null;
   }
 
-  return { iniciar, detener, pasada, recargarMes, estado: () => ({ ...estado }), rutas, ocupado: () => corriendo };
+  return {
+    iniciar, detener, pasada, recargarMes, rutas,
+    ocupado: () => corriendo,
+    estado: () => ({
+      ...estado,
+      activo: !!cfg.sync.activo,
+      ocupado: corriendo,
+      colaRecarga: [...colaRecarga],
+      detenido: fs.existsSync(rutas.detenido) ? leerJson(rutas.detenido, {}) : null,
+    }),
+  };
 }
 
 export function reanudar(dataDir) {

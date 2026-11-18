@@ -1,22 +1,29 @@
 #!/usr/bin/env node
-// Crea o actualiza un usuario del portal en config/usuarios.json (hash scrypt, nunca texto plano).
-// Uso (pide la contraseña sin mostrarla):
-//   node scripts/crear-usuario.js <usuario> "<Nombre visible>" [rol]
+// Crea o actualiza un usuario del portal en config/usuarios.json (scrypt: hash + salt; nunca texto plano).
+// La contraseña se pide por consola SIN mostrarla. Uso:
+//   node scripts/crear-usuario.js <usuario> "<Nombre visible>" <admin|gerencia>
+// En el servidor (config/ está montado solo-lectura en el contenedor del portal):
+//   docker run --rm -it --user 1000:1000 -v "$PWD":/app:Z -w /app node:20-alpine \
+//     node scripts/crear-usuario.js <usuario> "<Nombre>" admin
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import { hashPassword } from '../src/auth/passwords.js';
+import { hashPassword, MIN_LONGITUD } from '../src/auth/passwords.js';
+import { ROLES, USUARIO_VALIDO } from '../src/auth/users.js';
 
-const [usuario, nombre, rol = 'lector'] = process.argv.slice(2);
-if (!usuario || !nombre || !/^[a-z0-9._-]{3,32}$/i.test(usuario)) {
-  console.error('Uso: node scripts/crear-usuario.js <usuario> "<Nombre visible>" [lector|admin]');
+const [usuarioArg, nombre, rol] = process.argv.slice(2);
+const usuario = String(usuarioArg ?? '').toLowerCase();
+if (!USUARIO_VALIDO.test(usuario) || !nombre || !ROLES.includes(rol)) {
+  console.error(`Uso: node scripts/crear-usuario.js <usuario> "<Nombre visible>" <${ROLES.join('|')}>`);
+  console.error('usuario: 3-32 caracteres a-z 0-9 . _ -');
   process.exit(1);
 }
-if (!['lector', 'admin'].includes(rol)) {
-  console.error('Rol inválido: usa lector o admin');
+if (!process.stdin.isTTY) {
+  console.error('Se necesita una terminal interactiva (usa docker run -it).');
   process.exit(1);
 }
 
+// Lee una línea sin eco en pantalla.
 function preguntarOculto(texto) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
@@ -25,21 +32,26 @@ function preguntarOculto(texto) {
   });
 }
 
-const pwd = await preguntarOculto('Contraseña (mín. 10): ');
+const pwd = await preguntarOculto(`Contraseña (mín. ${MIN_LONGITUD}): `);
 const pwd2 = await preguntarOculto('Repite la contraseña: ');
-if (pwd !== pwd2) {
-  console.error('Las contraseñas no coinciden');
-  process.exit(1);
-}
+if (pwd !== pwd2) { console.error('Las contraseñas no coinciden'); process.exit(1); }
+
+let cred;
+try { cred = await hashPassword(pwd); } catch (e) { console.error(e.message); process.exit(1); }
 
 const file = path.join(process.env.CONFIG_DIR || new URL('../config/', import.meta.url).pathname, 'usuarios.json');
 const db = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { usuarios: [] };
-const existente = db.usuarios.find((u) => u.usuario === usuario);
-const registro = { usuario, nombre, rol, hash: hashPassword(pwd), actualizado: new Date().toISOString() };
-if (existente) Object.assign(existente, registro);
-else db.usuarios.push(registro);
+db.usuarios ??= [];
+const existente = db.usuarios.find((u) => String(u.usuario).toLowerCase() === usuario);
+const registro = { usuario, nombre, rol, ...cred, actualizado: new Date().toISOString() };
+if (existente) {
+  for (const k of Object.keys(existente)) delete existente[k];
+  Object.assign(existente, registro);
+} else {
+  db.usuarios.push(registro);
+}
 
 const tmp = `${file}.tmp`;
 fs.writeFileSync(tmp, JSON.stringify(db, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(tmp, file);
-console.log(`Usuario "${usuario}" ${existente ? 'actualizado' : 'creado'} (${rol}).`);
+console.log(`Usuario "${usuario}" ${existente ? 'actualizado' : 'creado'} (${rol}). Ya puede ingresar (no hace falta reiniciar).`);

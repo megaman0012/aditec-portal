@@ -218,8 +218,26 @@ export function calcular(datos, filtros, cfg = {}) {
     ? Object.fromEntries(RUBROS.map((k) => [k, totalFiltro[k] == null ? null : r2(totalFiltro[k] / conVentas)]))
     : null;
 
+  // 5. Por sucursal (de los asesores filtrados)
+  const grupos = new Map();
+  for (const a of asesores) {
+    const k = a.sucursal || '(sin sucursal)';
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(todos.find((t) => t.asesor === a.asesor));
+  }
+  const porSucursal = [...grupos].map(([sucursal, lista]) => {
+    const b = sumar(lista);
+    const ind = indicadores(b);
+    return {
+      sucursal, nAsesores: lista.length, nFacturas: b.nFacturas, ...redondear(ind),
+      part: Object.fromEntries(RUBROS.map((k) => [k, div(ind[k], nacional[k])])),
+      semaforo: semaforos(ind, umbrales),
+    };
+  }).sort((a, b) => b.vn - a.vn);
+
   return {
     desde, hasta,
+    porSucursal,
     gastosPendientes,
     etiquetaGastos: gastosPendientes ? ETIQUETA_PENDIENTE : null,
     asesores,

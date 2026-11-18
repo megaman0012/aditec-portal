@@ -45,6 +45,8 @@ export function cargarConfig(env = process.env) {
     session: {
       secret: env.SESSION_SECRET || '',
       horas: int(env, 'SESSION_HORAS', 8),
+      // Cookie con atributo Secure: activar cuando el portal esté detrás de HTTPS.
+      secure: String(env.COOKIE_SECURE ?? '').toLowerCase() === 'true',
     },
     mba3: {
       base: (env.MBA3_BASE || 'http://192.168.1.203:8081').replace(/\/+$/, ''),
@@ -73,6 +75,7 @@ export function cargarConfig(env = process.env) {
 export function validar(cfg) {
   const errores = [];
   const avisos = [];
+  if (cfg.session.horas < 1 || cfg.session.horas > 24) errores.push('SESSION_HORAS debe estar entre 1 y 24');
   if (cfg.session.secret.length < 32) errores.push('SESSION_SECRET falta o es corto (usa: openssl rand -hex 32)');
   if (!/^https?:\/\/[^/]+$/.test(cfg.mba3.base)) errores.push('MBA3_BASE inválida');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cfg.sync.historiaDesde)) errores.push('SYNC_HISTORIA_DESDE debe ser AAAA-MM-DD');
@@ -106,7 +109,7 @@ export function describe(cfg) {
   return {
     port: cfg.port,
     tz: cfg.tz,
-    session: { secret: cfg.session.secret ? 'definido' : 'FALTA', horas: cfg.session.horas },
+    session: { secret: cfg.session.secret ? 'definido' : 'FALTA', horas: cfg.session.horas, secure: cfg.session.secure },
     mba3: {
       base: cfg.mba3.base,
       codigo: cfg.mba3.codigo ? 'definido' : 'FALTA',

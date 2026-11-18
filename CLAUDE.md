@@ -69,7 +69,8 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
 ## Comandos
 - `docker compose up -d --build` · `docker compose logs -f portal` · `curl localhost:8090/health`
 - Tests: `docker run --rm -v "$PWD":/app:Z -w /app node:20-alpine node --test test/`
-- Crear usuario: `docker compose run --rm -it -v ./config:/app/config:Z portal node scripts/crear-usuario.js <usuario> "<Nombre>" [lector|admin]`
+- Crear usuario (pide la clave oculta; config/ es ro en el contenedor):
+  `docker run --rm -it --user 1000:1000 -v "$PWD":/app:Z -w /app node:20-alpine node scripts/crear-usuario.js <usuario> "<Nombre>" admin|gerencia`
 
 ## Motor de datos (Fase 5)
 - Caché por MES: `data/cache/AAAA-MM.json` = filas agregadas por día/vendedor
@@ -82,3 +83,13 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
 - `src/data/repo.js` es lo único que usa la web: lee caché, calcula periodo + mismo rango del año anterior.
 - `config/umbrales.json` (semáforo) y `config/reglas.json` (regla del descuento anómalo, apagada).
 - Un mes completo (oct-2026) = 10 peticiones, ~28 s.
+
+## Autenticación y API (Fase 6)
+- `src/app.js` (rutas) · `src/http.js` · `src/auth/{passwords,users,sessions,ratelimit}.js`.
+- usuarios.json: {usuario, nombre, rol admin|gerencia, hash, salt} (scrypt). Se relee al cambiar (sin reinicio).
+- Cookie `aditec_sid` HttpOnly, SameSite=Strict, HMAC-SHA256, SESSION_HORAS; Secure con COOKIE_SECURE=true.
+  El rol se lee de usuarios.json en cada petición; logout revoca el jti (en memoria).
+- Rate limit login: 5 fallos/IP en 15 min -> 429 15 min. POST con Origin ajeno -> 403.
+- `/` sin sesión -> 302 /login.html. Log `[acceso]`/`[auth]` sin contraseñas ni cookies.
+- Endpoints: /api/login, /api/logout, /api/me, /api/filtros, /api/tablero, /api/tablero.csv,
+  /api/estado (admin), POST /api/admin/recargar?mes= (admin, encola), /health. Máx. 24 meses por consulta.

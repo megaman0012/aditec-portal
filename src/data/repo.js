@@ -62,14 +62,18 @@ export function crearRepo(cfg) {
     const anterior = cargar(rAnt.desde, rAnt.hasta);
     const comp = calcular(anterior, { ...filtros, ...rAnt }, ccfg);
 
+    const corto = (a) => ({ vb: a.vb, vn: a.vn, cv: a.cv, ub: a.ub, gt: a.gt, un: a.un, run: a.run, pctD: a.pctD, pctC: a.pctC, pctMB: a.pctMB });
+    const fechas = Object.values(actual.cobertura.sincronizado).filter(Boolean).sort();
     return {
       ...res,
       cobertura: actual.cobertura,
+      actualizado: fechas.at(-1) ?? null,
       comparativo: {
         ...rAnt,
         cobertura: anterior.cobertura,
         totalFiltro: comp.totalFiltro,
-        porAsesor: Object.fromEntries(comp.asesores.map((a) => [a.asesor, { vb: a.vb, vn: a.vn, ub: a.ub, un: a.un, run: a.run, pctD: a.pctD, pctC: a.pctC, pctMB: a.pctMB }])),
+        porAsesor: Object.fromEntries(comp.asesores.map((a) => [a.asesor, corto(a)])),
+        porSucursal: Object.fromEntries(comp.porSucursal.map((s) => [s.sucursal, corto(s)])),
       },
     };
   }
