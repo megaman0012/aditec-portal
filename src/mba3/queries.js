@@ -21,6 +21,8 @@ export const TABLAS = {
     select: [
       'CORP', 'COD_SALESMAN', 'ADJUSTMENT_TYPE', 'TRANS_DATE', 'QUANTITY', 'TOT_RETURN_UNIT',
       'TRANS_COST', 'NET_LINE_TOTAL', 'Anulada',
+      // apoyo para cuadres (Fase 4)
+      'LINE_TOTAL', 'DISCOUNT_AMOUNT', 'TOT_RETURN_AMOUNT', 'UNIT_COST',
     ],
     filtroBase: (empresa) => `CORP = '${empresa}' AND ADJUSTMENT_TYPE = 'FT'`,
   },
@@ -28,11 +30,14 @@ export const TABLAS = {
     from: 'CONT_Asiento_Detalle',
     campoFecha: 'POST_TO_DATE',
     select: [
-      'GL_ACCOUNT_CODE', 'DEBIT_AMOUNT', 'CREDIT_AMOUNT', 'DEPARTMENT_CODE', 'PROFIT_CENTER_CODE',
-      'POST_TO_DATE', 'ORIGIN',
+      'CORP', 'GL_ACCOUNT_CODE', 'GL_MAIN_CODE_ONLY', 'GL_ACCOUNT_TYPE', 'ACCOUNT_NAME',
+      'DEBIT_AMOUNT', 'CREDIT_AMOUNT', 'DEPARTMENT_CODE', 'PROFIT_CENTER_CODE', 'POST_TO_DATE',
+      'ORIGIN', 'ADJUSTMENT_TYPE', 'Analisis_Sucursal',
     ],
-    // Las cuentas a traer se definen en Fase 4 (config/gastos.json).
-    filtroBase: () => '',
+    // Cuentas de costos y gastos: códigos 5xxx, 6xxx y 7xxx (rango de texto). NO filtrar por
+    // GL_ACCOUNT_TYPE: los asientos de NOMINA vienen con GL_ACCOUNT_TYPE vacío (hallazgo Fase 4).
+    // La clasificación nómina/generales se hace con prefijos de config/gastos.json.
+    filtroBase: (empresa) => `CORP = '${empresa}' AND GL_ACCOUNT_CODE >= '5' AND GL_ACCOUNT_CODE < '8'`,
   },
 };
 
@@ -91,7 +96,13 @@ export function rangoDeMes(mes) {
  * Trae todas las filas de una tabla en un rango, partiendo el rango si llega al límite.
  * Siempre en serie (await dentro del bucle), nunca en paralelo.
  */
+// MBA3 devuelve como máximo 3000 filas por consulta aunque se pida más (observado 2026-11-18:
+// CONT_Asiento_Detalle con limit 5000 devolvió exactamente 3000). Sin este tope el rango no se
+// partiría y se perderían filas en silencio.
+export const TOPE_SERVIDOR = 3000;
+
 export async function consultarRango(cliente, { tabla, empresa, desde, hasta, limit, alPartir = () => {} }) {
+  limit = Math.min(limit, TOPE_SERVIDOR);
   const t = TABLAS[tabla];
   const filas = await cliente.consultar({
     select: t.select.join(','),

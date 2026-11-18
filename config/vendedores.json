@@ -1,6 +1,19 @@
-{
-  "_comentario": "Catálogo de asesores para el tablero. Solo código, nombre visible y sucursal. SIN cédulas ni datos personales. Se completa en Fase 4 con los códigos reales de VENDEDOR / COD_SALESMAN.",
-  "vendedores": [
-    { "codigo": "EJEMPLO", "nombre": "Asesor de ejemplo", "sucursal": "MATRIZ", "activo": false }
-  ]
-}
+[
+  { "codigo": "NO-FR", "alias": "NOFR", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 185, "UIO": 61 } },
+  { "codigo": "VE-PA", "alias": "VEPA", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 42, "PRI": 14 } },
+  { "codigo": "CO-DI", "alias": "CODI", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 27, "PRI": 25 }, "_nota": "factura casi igual en PRI y UIO: confirmar sucursal" },
+  { "codigo": "BO-FE", "alias": "BOFE", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 54 } },
+  { "codigo": "RO-KE", "alias": "ROKE", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 45 } },
+  { "codigo": "AV-LE", "alias": "AVLE", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 76, "UIO": 8 } },
+  { "codigo": "HI-MO", "alias": "HIMO", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 59 } },
+  { "codigo": "OJ-IS", "alias": "OJIS", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 56, "PRI": 3 } },
+  { "codigo": "TR-ST", "alias": "TRST", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 34, "PRI": 8 } },
+  { "codigo": "LE-CR", "alias": "LECR", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 23, "PRI": 2 } },
+  { "codigo": "OFICI", "alias": "OFICI", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 16 }, "_nota": "parece cuenta de oficina, no un asesor: ¿incluir en el ranking?" },
+  { "codigo": "OR-DA", "alias": "ORDA", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 16 } },
+  { "codigo": "ES-MA", "alias": "ESMA", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 4 } },
+  { "codigo": "MA-DG", "alias": "MADG", "nombre": "", "sucursal": "", "area": "", "activo": true, "_origen_facturas_2026_10": { "PRI": 17 }, "_nota": "todas sus facturas con descuento = valor factura (¿obsequios/muestras?)" },
+  { "codigo": "MA-DO", "alias": "MADO", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 10 }, "_nota": "todas sus facturas con descuento = valor factura (¿obsequios/muestras?)" },
+  { "codigo": "UG-MA", "alias": "UGMA", "nombre": "", "sucursal": "", "area": "", "activo": true, "_nota": "solo 3 facturas en oct-2026" },
+  { "codigo": "OFIQT", "alias": "OFIQT", "nombre": "", "sucursal": "Quito", "area": "", "activo": true, "_origen_facturas_2026_10": { "UIO": 2 }, "_nota": "parece cuenta de oficina Quito, no un asesor" }
+]

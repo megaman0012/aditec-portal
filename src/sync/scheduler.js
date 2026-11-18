@@ -40,11 +40,12 @@ export function rutasCache(dataDir) {
   };
 }
 
-// Tablas a sincronizar: asientos solo cuando Fase 4 defina las cuentas de gasto.
+// Tablas a sincronizar: asientos en cuanto gastos.json tenga prefijos (aunque no esté confirmado,
+// así los datos están listos el día que se confirme).
 export function tablasActivas(cfg) {
   const t = ['facturas', 'movimientos'];
   const g = cfg.gastos ?? {};
-  if ((g.nomina?.length ?? 0) + (g.generales?.length ?? 0) > 0) t.push('asientos');
+  if ((g.nomina_prefijos?.length ?? 0) + (g.generales_prefijos?.length ?? 0) > 0) t.push('asientos');
   return t;
 }
 

@@ -25,3 +25,22 @@ test('validar: sin SESSION_SECRET es error; sin credenciales MBA3 es solo aviso'
 test('validar: MBA3_RENOVAR_MIN debe ser < 10', () => {
   assert.ok(validar(cargarConfig({ ...base, MBA3_RENOVAR_MIN: '10' })).errores.length > 0);
 });
+
+test('config real del repo (vendedores.json y gastos.json) es válida', () => {
+  const cfg = cargarConfig({ ...base, CONFIG_DIR: new URL('../config/', import.meta.url).pathname });
+  const v = validar(cfg);
+  assert.deepEqual(v.errores, []);
+  assert.ok(cfg.vendedores.length > 0);
+  if (cfg.gastos.confirmado !== true) assert.ok(v.avisos.some((a) => a.includes('Pendiente')));
+});
+
+test('gastos confirmado con department_code "?" es error', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cfg-'));
+  fs.writeFileSync(path.join(dir, 'vendedores.json'), '[{"codigo":"A"}]');
+  fs.writeFileSync(path.join(dir, 'gastos.json'), JSON.stringify({ confirmado: true, nomina_prefijos: ['6111'], generales_prefijos: [], asignacion: { A: { department_code: '?' } } }));
+  const v = validar(cargarConfig({ ...base, CONFIG_DIR: dir }));
+  assert.ok(v.errores.some((e) => e.includes('department_code')));
+});

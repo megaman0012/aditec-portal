@@ -2,6 +2,7 @@
 // Divisiones entre 0 -> null (la web muestra "—").
 
 export const div = (a, b) => (b === 0 || b == null || a == null || !Number.isFinite(a / b) ? null : a / b);
+export const ETIQUETA_PENDIENTE = 'Pendiente de configurar';
 const n = (v) => {
   const x = Number(v);
   return Number.isFinite(x) ? x : 0;
@@ -30,14 +31,17 @@ export function costoDeMovimiento(m) {
 }
 
 // Indicadores a partir de las bases { vb, dd, cv, gn, gg }.
+// gn/gg = null -> gastos "Pendiente de configurar": GT, UN, U, RUN y R también quedan null.
 export function indicadores({ vb = 0, dd = 0, cv = 0, gn = 0, gg = 0 }) {
   const vn = vb - dd;
   const ub = vn - cv;
-  const gt = gn + gg;
-  const un = ub - gt;
-  const u = vn - gt;
+  const gastosPendientes = gn == null || gg == null;
+  const gt = gastosPendientes ? null : gn + gg;
+  const un = gastosPendientes ? null : ub - gt;
+  const u = gastosPendientes ? null : vn - gt;
   return {
-    vb, dd, vn, cv, ub, gn, gg, gt, un, u,
+    gastosPendientes,
+    vb, dd, vn, cv, ub, gn: gastosPendientes ? null : gn, gg: gastosPendientes ? null : gg, gt, un, u,
     run: div(un, vn),
     r: div(u, vn),
     pctD: div(dd, vb),
@@ -46,8 +50,10 @@ export function indicadores({ vb = 0, dd = 0, cv = 0, gn = 0, gg = 0 }) {
   };
 }
 
-// Agrega por asesor. gastosPorAsesor: { [asesor]: { gn, gg } } (origen definido en Fase 4).
-export function resumenPorAsesor({ facturas = [], movimientos = [], gastosPorAsesor = {} }) {
+// Agrega por asesor. gastosPorAsesor: { [asesor]: { gn, gg } }, o null mientras
+// config/gastos.json no esté confirmado (indicadores de gastos = "Pendiente de configurar").
+export function resumenPorAsesor({ facturas = [], movimientos = [], gastosPorAsesor = null }) {
+  const gastosPendientes = gastosPorAsesor == null;
   const base = new Map();
   const get = (k) => {
     const key = String(k ?? '').trim() || '(sin asesor)';
@@ -65,24 +71,25 @@ export function resumenPorAsesor({ facturas = [], movimientos = [], gastosPorAse
     if (!movimientoValido(m)) continue;
     get(m.COD_SALESMAN).cv += costoDeMovimiento(m);
   }
-  for (const [asesor, g] of Object.entries(gastosPorAsesor)) {
+  for (const [asesor, g] of Object.entries(gastosPorAsesor ?? {})) {
     const b = get(asesor);
     b.gn += n(g.gn);
     b.gg += n(g.gg);
   }
+  const conGastos = (b) => (gastosPendientes ? { ...b, gn: null, gg: null } : b);
 
   const total = { vb: 0, dd: 0, cv: 0, gn: 0, gg: 0 };
   for (const b of base.values()) for (const k of Object.keys(total)) total[k] += b[k];
-  const totalInd = indicadores(total);
+  const totalInd = indicadores(conGastos(total));
 
   const RUBROS = ['vb', 'dd', 'vn', 'cv', 'ub', 'gn', 'gg', 'gt', 'un', 'u'];
   const asesores = [...base.entries()]
     .map(([asesor, b]) => {
-      const ind = indicadores(b);
+      const ind = indicadores(conGastos(b));
       const part = Object.fromEntries(RUBROS.map((r) => [r, div(ind[r], totalInd[r])]));
       return { asesor, ...ind, part };
     })
     .sort((a, b) => b.vn - a.vn);
 
-  return { asesores, total: totalInd };
+  return { asesores, total: totalInd, gastosPendientes };
 }

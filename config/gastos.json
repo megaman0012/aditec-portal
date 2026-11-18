@@ -1,9 +1,53 @@
 {
-  "_comentario": "Clasificación de cuentas contables (CONT_Asiento_Detalle.GL_ACCOUNT_CODE) en Gastos de nómina (GN) y Gastos generales (GG), y cómo se asignan a cada asesor (DEPARTMENT_CODE / PROFIT_CENTER_CODE). Se define y valida en Fase 4.",
-  "nomina": [],
-  "generales": [],
+  "confirmado": false,
+  "_comentario": "PROPUESTA Fase 4 (mes de referencia 2026-10). No usar en el tablero hasta que Luis Guzmán ponga confirmado=true. Prefijos sobre GL_ACCOUNT_CODE.",
+
+  "nomina_prefijos": ["6111"],
+  "generales_prefijos": ["6112"],
+  "excluir_prefijos": ["61120200", "61120201"],
+  "_excluir_motivo": "61120200 participación trabajadores y 61120201 impuesto a la renta: van después de la utilidad operativa.",
+
+  "_fuera_de_gastos": {
+    "51": "Costos (5111 costo de ventas, 5121 bajas/ajustes, 5130 mano de obra de producción, 5140 CIF). El CV del portal sale de movimientos FT; 5130/5140 son costo de producción, no gasto del asesor.",
+    "7111": "Gastos financieros (intereses, comisiones bancarias): propuesta NO incluir. 2026-10: 8817.58",
+    "7112": "Gastos no operacionales (pérdida por robo): propuesta NO incluir. 2026-10: 183.74"
+  },
+
+  "_dimensiones": {
+    "DEPARTMENT_CODE": { "1": "Matriz (ORIGEN 'PRI') — supuesto", "2": "Quito (ORIGEN 'UIO', bodega QPT) — supuesto", "3": "¿tercera sucursal? solo nómina 5252.52 y 6112 103.46" },
+    "PROFIT_CENTER_CODE": { "01": "Comercial / ventas (transporte, promoción, atención a clientes, comisiones)", "02": "Administración (gestión, impuestos, honorarios, seguros)", "00": "General", "50-52": "Producción (solo cuentas 51)" }
+  },
+
+  "asignacion_modo": "por_departamento_y_prorrateo",
+  "_asignacion_explicacion": "En MBA3 los gastos y la nómina NO traen código de asesor: solo DEPARTMENT_CODE (sucursal) y PROFIT_CENTER_CODE (área). Propuesta: cada asesor pertenece a un departamento; el gasto comercial (PC 01) de su departamento se reparte entre los asesores de ese departamento en proporción a sus ventas netas; el gasto administrativo/general (PC 02 y 00) y el del departamento 3 se reparten a nivel nacional por ventas netas (ver sin_asignar).",
   "asignacion": {
-    "por": "PENDIENTE",
-    "mapa": {}
+    "NO-FR": { "department_code": "1", "profit_center_code": "01" },
+    "VE-PA": { "department_code": "2", "profit_center_code": "01" },
+    "CO-DI": { "department_code": "?", "profit_center_code": "01", "_nota": "PRI 25 / UIO 27 facturas" },
+    "BO-FE": { "department_code": "1", "profit_center_code": "01" },
+    "RO-KE": { "department_code": "1", "profit_center_code": "01" },
+    "AV-LE": { "department_code": "1", "profit_center_code": "01" },
+    "HI-MO": { "department_code": "1", "profit_center_code": "01" },
+    "OJ-IS": { "department_code": "2", "profit_center_code": "01" },
+    "TR-ST": { "department_code": "2", "profit_center_code": "01" },
+    "LE-CR": { "department_code": "2", "profit_center_code": "01" },
+    "OR-DA": { "department_code": "2", "profit_center_code": "01" },
+    "ES-MA": { "department_code": "1", "profit_center_code": "01" },
+    "UG-MA": { "department_code": "?", "profit_center_code": "01" },
+    "MA-DG": { "department_code": "1", "profit_center_code": "01" },
+    "MA-DO": { "department_code": "2", "profit_center_code": "01" },
+    "OFICI": { "department_code": "1", "profit_center_code": "01" },
+    "OFIQT": { "department_code": "2", "profit_center_code": "01" }
+  },
+  "sin_asignar": "prorratear_por_ventas_netas",
+
+  "_alternativa_nomina_por_empleado": "La nómina (ADJUSTMENT_TYPE='NOMINA', ~56 empleados) trae una línea por empleado y cuenta, pero sin código de asesor en los campos consultados. Si el Excel asigna la nómina real de cada asesor, habría que identificar qué campo de MBA3 relaciona la línea con el empleado (y mapear empleado→VENDEDOR sin cédulas). Requiere exploración adicional aprobada.",
+
+  "_referencia_2026_10": {
+    "nomina_6111": 128211.03,
+    "generales_6112": 190306.36,
+    "generales_6112_sin_excluidos": 189329.85,
+    "6111_por_dep_pc": { "1|01": 39308.79, "1|02": 36906.07, "2|01": 37630.90, "2|02": 9401.69, "3|01": 4963.58 },
+    "6112_por_dep_pc": { "1|00": 2086.68, "1|01": 39380.66, "1|02": 114920.29, "2|01": 22695.86, "2|02": 11119.41, "3|01": 103.46 }
   }
 }

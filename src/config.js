@@ -21,6 +21,12 @@ function leerJson(dir, nombre, def) {
   }
 }
 
+// vendedores.json: arreglo [{codigo, alias, nombre, sucursal, area, activo}] (formato Fase 4).
+// Se acepta también el formato antiguo { vendedores: [...] }.
+function normalizarVendedores(v) {
+  return Array.isArray(v) ? v : Array.isArray(v?.vendedores) ? v.vendedores : null;
+}
+
 export function cargarConfig(env = process.env) {
   const configDir = env.CONFIG_DIR || new URL('../config/', import.meta.url).pathname;
   const cfg = {
@@ -48,8 +54,8 @@ export function cargarConfig(env = process.env) {
       mesActualMin: int(env, 'SYNC_MES_ACTUAL_MIN', 30),
       historiaDesde: env.SYNC_HISTORIA_DESDE || '2025-01-01',
     },
-    vendedores: leerJson(configDir, 'vendedores.json', { vendedores: [] }),
-    gastos: leerJson(configDir, 'gastos.json', { nomina: [], generales: [] }),
+    vendedores: normalizarVendedores(leerJson(configDir, 'vendedores.json', [])),
+    gastos: { confirmado: false, nomina_prefijos: [], generales_prefijos: [], excluir_prefijos: [], ...leerJson(configDir, 'gastos.json', {}) },
   };
   return cfg;
 }
@@ -65,7 +71,18 @@ export function validar(cfg) {
   if (cfg.mba3.limit < 1) errores.push('MBA3_LIMIT debe ser > 0');
   if (cfg.sync.mesActualMin < 5) errores.push('SYNC_MES_ACTUAL_MIN mínimo 5');
   if (!cfg.mba3.codigo || !cfg.mba3.pwd) avisos.push('MBA3_CODIGO/MBA3_PWD vacíos: sincronizador deshabilitado');
-  if (!Array.isArray(cfg.vendedores.vendedores)) errores.push('config/vendedores.json: falta arreglo "vendedores"');
+  if (!Array.isArray(cfg.vendedores)) errores.push('config/vendedores.json debe ser un arreglo de vendedores');
+  else if (cfg.vendedores.some((v) => !v?.codigo)) errores.push('config/vendedores.json: todo vendedor necesita "codigo"');
+  const g = cfg.gastos;
+  if (!Array.isArray(g.nomina_prefijos) || !Array.isArray(g.generales_prefijos)) {
+    errores.push('config/gastos.json: nomina_prefijos y generales_prefijos deben ser arreglos');
+  } else if (g.confirmado === true) {
+    if (!g.nomina_prefijos.length && !g.generales_prefijos.length) errores.push('config/gastos.json confirmado sin prefijos');
+    const dudosos = Object.entries(g.asignacion ?? {}).filter(([, a]) => !a?.department_code || a.department_code === '?').map(([k]) => k);
+    if (dudosos.length) errores.push(`config/gastos.json confirmado con asesores sin department_code: ${dudosos.join(', ')}`);
+  } else {
+    avisos.push('config/gastos.json sin confirmar: gastos se muestran "Pendiente de configurar"');
+  }
   return { errores, avisos };
 }
 
@@ -85,7 +102,8 @@ export function describe(cfg) {
       limit: cfg.mba3.limit,
     },
     sync: cfg.sync,
-    vendedores: cfg.vendedores.vendedores?.length ?? 0,
+    vendedores: cfg.vendedores?.length ?? 0,
+    gastos: cfg.gastos.confirmado === true ? 'confirmado' : 'pendiente',
   };
 }
 

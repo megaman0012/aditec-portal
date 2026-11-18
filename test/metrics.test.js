@@ -58,3 +58,15 @@ test('resumen por asesor con participación nacional', () => {
   assert.equal(b.part.gn, 0);
   assert.equal(asesores[0].asesor, 'A01'); // orden por VN desc
 });
+
+test('gastos sin confirmar: GN, GG, GT, UN, U, RUN y R quedan null ("Pendiente de configurar")', () => {
+  const facturas = [{ VENDEDOR: 'A01', TIPO_DOCUMENTO: 'FACT', ANULADA: false, SUBTOTAL_CON_IVA: 100, SUBTOTAL_SIN_IVA: 0, VALOR_TOTAL_DESCUENTO: 0, TOTAL_DEVOLUCION: 0 }];
+  const { asesores, total, gastosPendientes } = resumenPorAsesor({ facturas, movimientos: [] });
+  assert.equal(gastosPendientes, true);
+  for (const r of [asesores[0], total]) {
+    for (const k of ['gn', 'gg', 'gt', 'un', 'u', 'run', 'r']) assert.equal(r[k], null, k);
+    assert.equal(r.vn, 100); // ventas y margen siguen funcionando
+    assert.equal(r.pctMB, 1);
+  }
+  assert.equal(asesores[0].part.gt, null);
+});
