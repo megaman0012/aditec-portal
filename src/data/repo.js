@@ -62,7 +62,8 @@ export function crearRepo(cfg) {
     const anterior = cargar(rAnt.desde, rAnt.hasta);
     const comp = calcular(anterior, { ...filtros, ...rAnt }, ccfg);
 
-    const corto = (a) => ({ vb: a.vb, vn: a.vn, cv: a.cv, ub: a.ub, gt: a.gt, un: a.un, run: a.run, pctD: a.pctD, pctC: a.pctC, pctMB: a.pctMB });
+    const CAMPOS = ['vb', 'dd', 'vn', 'cv', 'ub', 'gn', 'gg', 'gt', 'un', 'u', 'run', 'r', 'pctD', 'pctC', 'pctMB'];
+    const corto = (a) => Object.fromEntries(CAMPOS.map((k) => [k, a[k]]));
     const fechas = Object.values(actual.cobertura.sincronizado).filter(Boolean).sort();
     return {
       ...res,

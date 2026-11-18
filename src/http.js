@@ -6,7 +6,7 @@ export const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
-  'Cross-Origin-Opener-Policy': 'same-origin',
+  // Cross-Origin-Opener-Policy se omite: Chrome la ignora (con error en consola) fuera de HTTPS.
   'Cross-Origin-Resource-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'Cache-Control': 'no-store',

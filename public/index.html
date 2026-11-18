@@ -3,21 +3,89 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Portal ADITEC — Rentabilidad por empleado</title>
+  <title>ADITEC ECUATORIANA — Rentabilidad por empleado</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-  <header class="barra">
-    <img src="/img/logo.svg" alt="ADITEC" class="logo">
-    <div>
-      <h1>ADITEC ECUATORIANA – Rentabilidad por empleado</h1>
-      <p class="sub">Resumen nacional · beta</p>
+<body class="cargando">
+  <header class="encabezado">
+    <div class="marca">
+      <img src="/img/logo.svg" alt="" class="logo">
+      <div>
+        <h1>ADITEC ECUATORIANA</h1>
+        <p class="sub">Rentabilidad por empleado · Resumen nacional</p>
+      </div>
+    </div>
+    <div class="sesion">
+      <span class="actualizado" id="actualizado">Datos actualizados: —</span>
+      <button type="button" class="boton secundario" id="btn-recargar" hidden title="Volver a descargar de MBA3 el mes de la fecha Hasta">⟳ Recargar mes</button>
+      <span class="usuario" id="usuario"></span>
+      <button type="button" class="boton secundario" id="btn-salir">Salir</button>
     </div>
   </header>
+
+  <form class="filtros" id="filtros" autocomplete="off">
+    <div class="grupo fechas">
+      <label class="campo">Desde <input type="date" id="f-desde" required></label>
+      <label class="campo">Hasta <input type="date" id="f-hasta" required></label>
+    </div>
+    <div class="grupo atajos" role="group" aria-label="Atajos de fecha">
+      <button type="button" class="chip" data-atajo="mes">Este mes</button>
+      <button type="button" class="chip" data-atajo="mesAnterior">Mes anterior</button>
+      <button type="button" class="chip" data-atajo="trimestre">Trimestre</button>
+      <button type="button" class="chip" data-atajo="ytd">Año en curso</button>
+      <button type="button" class="chip" data-atajo="anioAnterior">Año anterior</button>
+    </div>
+    <div class="grupo selects">
+      <label class="campo">Sucursal
+        <select id="f-sucursal"><option value="">Todas</option></select>
+      </label>
+      <label class="campo">Área
+        <select id="f-area"><option value="">Todas</option></select>
+      </label>
+      <div class="campo multi" id="f-asesores">
+        <span class="etiqueta">Asesores</span>
+        <button type="button" class="multi-boton" aria-haspopup="listbox" aria-expanded="false">Todos</button>
+        <div class="multi-panel" hidden>
+          <input type="search" class="multi-buscar" placeholder="Buscar asesor…" aria-label="Buscar asesor">
+          <div class="multi-acciones">
+            <button type="button" class="enlace" data-accion="todos">Todos</button>
+            <button type="button" class="enlace" data-accion="ninguno">Ninguno</button>
+          </div>
+          <ul class="multi-lista" role="listbox" aria-multiselectable="true"></ul>
+        </div>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="f-comparar"> Comparar con el mismo periodo del año anterior</label>
+    <button type="submit" class="boton primario" id="btn-aplicar">Aplicar</button>
+  </form>
+
+  <div class="avisos" id="avisos" aria-live="polite"></div>
+
   <main class="contenido">
-    <p class="aviso">En construcción (Fase 2). El tablero se habilita en la Fase 5.</p>
-    <p id="chart-status" class="muted">Chart.js: verificando…</p>
+    <section class="kpis" id="kpis" aria-label="Indicadores nacionales"></section>
+
+    <section class="sin-datos tarjeta" id="sin-datos" hidden>
+      <h2>No hay datos en el rango seleccionado</h2>
+      <p class="muted" id="sin-datos-detalle">Prueba con otro rango de fechas o quita los filtros.</p>
+    </section>
+
+    <section class="tablero" id="tablero" aria-label="Gráficos por asesor"></section>
+
+    <section class="tarjeta tabla-tarjeta" id="tabla-tarjeta">
+      <div class="tabla-cabecera">
+        <h2>VALORES DE CADA ASESOR</h2>
+        <a class="boton secundario" id="btn-csv" href="#" download>Exportar CSV</a>
+      </div>
+      <div class="tabla-scroll" id="tabla-scroll">
+        <table class="tabla" id="tabla"></table>
+      </div>
+    </section>
   </main>
+
+  <footer class="pie-pagina muted">Portal ADITEC · beta · solo lectura sobre MBA3</footer>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
   <script src="/vendor/chart.umd.min.js"></script>
   <script src="/app.js"></script>
 </body>

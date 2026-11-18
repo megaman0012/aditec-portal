@@ -93,3 +93,14 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
 - `/` sin sesión -> 302 /login.html. Log `[acceso]`/`[auth]` sin contraseñas ni cookies.
 - Endpoints: /api/login, /api/logout, /api/me, /api/filtros, /api/tablero, /api/tablero.csv,
   /api/estado (admin), POST /api/admin/recargar?mes= (admin, encola), /health. Máx. 24 meses por consulta.
+
+## Frontend (Fase 7)
+- `public/login.html|login.js`, `public/index.html|app.js|styles.css`. JS vanilla + Chart.js local; sin scripts
+  ni estilos inline (CSP). Estilos por CSSOM (`el.style.x`) sí están permitidos.
+- Filtros en la URL (`?desde&hasta&sucursal&area&vendedores&comparar=1`). Comparar no vuelve a pedir datos.
+- No reemplazar `Chart.defaults.animation` completo (rompe el easing: "this._fn is not a function").
+- MODO DEV (simulador + datos sintéticos, nunca MBA3 real):
+  `docker run --rm -it -p 127.0.0.1:8091:8091 -v "$PWD":/app:ro,Z -w /app node:20-alpine node scripts/dev.js`
+  -> http://localhost:8091 usuario dev / clave desarrollo-123 (DEV_GASTOS_CONFIRMADOS=false para ver pendientes).
+- CAPTURAS: `scripts/capturas.py` con la imagen mcr.microsoft.com/playwright/python:v1.48.0-noble
+  (+ `pip install playwright==1.48.0`); la clave va por variable de entorno PORTAL_CLAVE.

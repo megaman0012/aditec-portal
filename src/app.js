@@ -229,10 +229,11 @@ export function crearApp(cfg, deps = {}) {
     throw new HttpError(404, 'No encontrado');
   }
 
-  async function estatico(req, res, pathname) {
+  async function estatico(req, res, pathname, search = '') {
     // La página principal exige sesión; el login y los recursos son públicos.
     if ((pathname === '/' || pathname === '/index.html') && !req.sesion) {
-      return send(res, 302, '', 'text/plain; charset=utf-8', { Location: '/login.html' });
+      const volver = search ? `?volver=${encodeURIComponent(`/${search}`)}` : '';
+      return send(res, 302, '', 'text/plain; charset=utf-8', { Location: `/login.html${volver}` });
     }
     if (pathname === '/login.html' && req.sesion) {
       return send(res, 302, '', 'text/plain; charset=utf-8', { Location: '/' });
@@ -270,7 +271,7 @@ export function crearApp(cfg, deps = {}) {
         return await api(req, res, url);
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Método no permitido', undefined, { Allow: 'GET, HEAD' });
-      return await estatico(req, res, url.pathname);
+      return await estatico(req, res, url.pathname, url.search);
     } catch (err) {
       if (err instanceof HttpError) return sendJson(res, err.status, { error: err.message }, err.extra);
       log.error('[http] error:', err.message);
