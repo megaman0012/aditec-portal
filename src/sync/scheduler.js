@@ -84,7 +84,7 @@ export function crearSincronizador(cfg, { log = console, crearCliente } = {}) {
     log.error('[sync] ======================================================');
     log.error('[sync] SINCRONIZADOR DETENIDO:', motivo);
     log.error('[sync] Revisar MBA3 > Servicios de Acceso Externo > IPs y luego:');
-    log.error('[sync]   docker compose exec portal node scripts/sync-manual.js --reanudar');
+    log.error('[sync]   docker compose exec aditec-portal node scripts/sync-manual.js --reanudar');
     log.error('[sync] ======================================================');
     detener();
   }

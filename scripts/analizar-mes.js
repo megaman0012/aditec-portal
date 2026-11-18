@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Análisis de un mes ya sincronizado (lee SOLO la caché; 0 peticiones a MBA3).
-// Uso: docker compose exec portal node scripts/analizar-mes.js 2026-10
+// Uso: docker compose exec aditec-portal node scripts/analizar-mes.js 2026-10
 // Guarda el resultado completo en data/exploracion/analisis-<mes>.json
 import fs from 'node:fs';
 import path from 'node:path';

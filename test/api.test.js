@@ -199,3 +199,15 @@ test('rate limit (unidad): ventana de 15 min y bloqueo de 15 min', () => {
   t += 15 * 60_000;
   assert.equal(rl.bloqueado('1.2.3.4'), 0);
 });
+
+test('IP del cliente: X-Forwarded-For solo si viene de un proxy de confianza', async () => {
+  const { crearIpDe, ipEnRed } = await import('../src/http.js');
+  assert.equal(ipEnRed('172.18.0.5', '172.18.0.0/16'), true);
+  assert.equal(ipEnRed('192.168.1.50', '172.18.0.0/16'), false);
+  const req = (remota, xff) => ({ socket: { remoteAddress: remota }, headers: xff ? { 'x-forwarded-for': xff } : {} });
+  const sinProxy = crearIpDe({});
+  assert.equal(sinProxy(req('::ffff:192.168.1.20', '1.2.3.4')), '192.168.1.20'); // ignora XFF
+  const conProxy = crearIpDe({ confiar: true, redes: ['172.18.0.0/16'] });
+  assert.equal(conProxy(req('172.18.0.9', 'falsa, 192.168.1.77')), '192.168.1.77'); // última entrada (la del proxy)
+  assert.equal(conProxy(req('192.168.1.30', '10.0.0.1')), '192.168.1.30'); // no viene del proxy: XFF ignorado
+});

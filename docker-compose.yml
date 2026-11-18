@@ -1,20 +1,22 @@
 name: aditec-portal
 
 services:
-  portal:
+  aditec-portal:
     build: .
-    image: aditec-portal:0.1.0
+    image: aditec-portal:0.3.0
     container_name: aditec-portal
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8090:8090"
+      - "8090:8090"            # acceso directo en la LAN (firewalld lo limita a la red interna)
     volumes:
       # :Z = etiqueta SELinux privada (host en Enforcing)
-      - ./data:/app/data:Z
-      - ./config:/app/config:ro,Z
+      - ./data:/app/data:Z                 # caché + estado (lectura/escritura)
+      - ./config:/app/config:ro,Z          # configuración y usuarios (solo lectura para el portal)
     networks:
       - aditec-net
+    mem_limit: 512m
+    memswap_limit: 512m
     read_only: true
     tmpfs:
       - /tmp
@@ -27,6 +29,26 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+    # ------------------------------------------------------------------
+    # DETRÁS DEL PROXY INVERSO COMÚN (dominio + HTTPS) — para más adelante.
+    # 1) Quitar el bloque `ports:` de arriba (el proxy llega por la red aditec-net).
+    # 2) Descomentar:
+    # expose:
+    #   - "8090"
+    # environment:
+    #   COOKIE_SECURE: "true"        # cookie solo por HTTPS
+    #   TRUST_PROXY: "true"          # usar X-Forwarded-For del proxy para el rate limit y los logs
+    #   TRUSTED_PROXY_IPS: "172.18.0.0/16"   # solo confiar en X-Forwarded-For si viene del proxy
+    # labels:                        # si el proxy común es Traefik:
+    #   - traefik.enable=true
+    #   - traefik.docker.network=aditec-net
+    #   - traefik.http.routers.aditec-portal.rule=Host(`portal.aditec.local`)
+    #   - traefik.http.routers.aditec-portal.entrypoints=websecure
+    #   - traefik.http.routers.aditec-portal.tls=true
+    #   - traefik.http.services.aditec-portal.loadbalancer.server.port=8090
+    # Si es Nginx o Caddy, ver ops/proxy-ejemplo.md.
+    # ------------------------------------------------------------------
 
 networks:
   aditec-net:

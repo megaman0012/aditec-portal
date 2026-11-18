@@ -1,17 +1,22 @@
+# Portal ADITEC — imagen de producción.
+# Sin dependencias npm (solo módulos nativos de Node): no hay `npm install`.
 FROM node:20-alpine
 
 ENV NODE_ENV=production \
+    TZ=America/Guayaquil \
     DATA_DIR=/app/data \
     CONFIG_DIR=/app/config \
-    PUBLIC_DIR=/app/public/
+    PUBLIC_DIR=/app/public/ \
+    NODE_OPTIONS=--max-old-space-size=384
 
 WORKDIR /app
-COPY package.json ./
-COPY src ./src
-COPY public ./public
-COPY scripts ./scripts
+COPY --chown=root:root package.json ./
+COPY --chown=root:root src ./src
+COPY --chown=root:root public ./public
+COPY --chown=root:root scripts ./scripts
 
-# Usuario sin privilegios (uid 1000 = node; coincide con 'aditec' en el host para ./data)
+# Usuario sin privilegios (uid 1000 = node; coincide con 'aditec' en el host para ./data).
+# El código queda como root:root, de solo lectura para el proceso.
 USER node
 EXPOSE 8090
 

@@ -79,3 +79,24 @@ export function lista(valor, { max = 50, nombre = 'parámetro' } = {}) {
 export function ipDe(req) {
   return String(req.socket?.remoteAddress ?? '?').replace(/^::ffff:/, '');
 }
+
+// ¿La IPv4 `ip` pertenece a la red `cidr` (p. ej. "172.18.0.0/16")?
+export function ipEnRed(ip, cidr) {
+  const aNum = (x) => x.split('.').reduce((n, o) => (n << 8) + (Number(o) & 255), 0) >>> 0;
+  const [red, bits = '32'] = String(cidr).split('/');
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip) || !/^\d+\.\d+\.\d+\.\d+$/.test(red)) return false;
+  const b = Number(bits);
+  const mascara = b === 0 ? 0 : (~0 << (32 - b)) >>> 0;
+  return (aNum(ip) & mascara) === (aNum(red) & mascara);
+}
+
+// IP del cliente. Detrás del proxy (TRUST_PROXY=true) usa la ÚLTIMA entrada de X-Forwarded-For,
+// solo si la conexión viene de una red de proxy de confianza (TRUSTED_PROXY_IPS).
+export function crearIpDe({ confiar = false, redes = [] } = {}) {
+  return (req) => {
+    const directa = ipDe(req);
+    if (!confiar || !redes.some((r) => ipEnRed(directa, r))) return directa;
+    const xff = String(req.headers['x-forwarded-for'] ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    return xff.length ? xff[xff.length - 1].replace(/^::ffff:/, '') : directa;
+  };
+}

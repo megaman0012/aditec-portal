@@ -57,6 +57,10 @@ export function cargarConfig(env = process.env) {
       renovarMs: int(env, 'MBA3_RENOVAR_MIN', 8) * 60_000,
       limit: int(env, 'MBA3_LIMIT', 5000),
     },
+    proxy: {
+      confiar: String(env.TRUST_PROXY ?? '').toLowerCase() === 'true',
+      redes: String(env.TRUSTED_PROXY_IPS ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+    },
     sync: {
       // Interruptor general: el sincronizador solo arranca con SYNC_ACTIVO=true.
       activo: String(env.SYNC_ACTIVO ?? '').toLowerCase() === 'true',
@@ -80,6 +84,7 @@ export function validar(cfg) {
   if (!/^https?:\/\/[^/]+$/.test(cfg.mba3.base)) errores.push('MBA3_BASE inválida');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cfg.sync.historiaDesde)) errores.push('SYNC_HISTORIA_DESDE debe ser AAAA-MM-DD');
   if (cfg.mba3.renovarMs <= 0 || cfg.mba3.renovarMs >= 10 * 60_000) errores.push('MBA3_RENOVAR_MIN debe estar entre 1 y 9');
+  if (cfg.proxy.confiar && !cfg.proxy.redes.length) errores.push('TRUST_PROXY=true exige TRUSTED_PROXY_IPS (red del proxy)');
   if (cfg.mba3.limit < 1) errores.push('MBA3_LIMIT debe ser > 0');
   if (cfg.sync.mesActualMin < 5) errores.push('SYNC_MES_ACTUAL_MIN mínimo 5');
   if (!cfg.mba3.codigo || !cfg.mba3.pwd) avisos.push('MBA3_CODIGO/MBA3_PWD vacíos: sincronizador deshabilitado');

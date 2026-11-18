@@ -67,7 +67,7 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
 - 2026-11-17: primera prueba real -> error 003 "IP No Autorizada" para 192.168.1.50 (1 sola petición).
 
 ## Comandos
-- `docker compose up -d --build` · `docker compose logs -f portal` · `curl localhost:8090/health`
+- `docker compose up -d --build` · `docker compose logs -f aditec-portal` · `curl localhost:8090/health`
 - Tests: `docker run --rm -v "$PWD":/app:Z -w /app node:20-alpine node --test test/`
 - Crear usuario (pide la clave oculta; config/ es ro en el contenedor):
   `docker run --rm -it --user 1000:1000 -v "$PWD":/app:Z -w /app node:20-alpine node scripts/crear-usuario.js <usuario> "<Nombre>" admin|gerencia`
@@ -104,3 +104,10 @@ Excluir ANULADA y no-'FACT'. División entre 0 -> null ("—").
   -> http://localhost:8091 usuario dev / clave desarrollo-123 (DEV_GASTOS_CONFIRMADOS=false para ver pendientes).
 - CAPTURAS: `scripts/capturas.py` con la imagen mcr.microsoft.com/playwright/python:v1.48.0-noble
   (+ `pip install playwright==1.48.0`); la clave va por variable de entorno PORTAL_CLAVE.
+
+## Publicación (Fase 8)
+- Servicio compose `aditec-portal` (antes `portal`): `docker compose exec aditec-portal ...`.
+- mem_limit 512m (Node --max-old-space-size=384), TZ=America/Guayaquil (Node usa ICU; `date` de busybox muestra UTC).
+- config/ montado :ro (crear usuarios con contenedor aparte); data/ rw. Logs json-file 10m x3.
+- Proxy inverso: bloque comentado en docker-compose.yml + ops/proxy-ejemplo.md. TRUST_PROXY=true +
+  TRUSTED_PROXY_IPS (CIDR) para tomar la IP real de X-Forwarded-For (rate limit y logs); COOKIE_SECURE=true con HTTPS.

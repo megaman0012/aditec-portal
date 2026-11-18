@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Prueba mínima contra MBA3: login + UNA consulta con limit 1 (2 peticiones en total).
-// Uso: docker compose exec portal node scripts/probar-conexion.js
+// Uso: docker compose exec aditec-portal node scripts/probar-conexion.js
 import { crearCliente, config, describirColumnas } from './_comun.js';
 import { TABLAS, whereRango, sumarDias } from '../src/mba3/queries.js';
 import { hoyEn } from '../src/sync/scheduler.js';

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Sincronización manual por meses, o reanudación tras una detención.
 // Uso:
-//   docker compose exec portal node scripts/sync-manual.js --mes=2026-10            (recargar un mes)
-//   docker compose exec portal node scripts/sync-manual.js --desde=2026-01 --hasta=2026-10
-//   docker compose exec portal node scripts/sync-manual.js --pendientes             (plan automático)
-//   docker compose exec portal node scripts/sync-manual.js --estado
-//   docker compose exec portal node scripts/sync-manual.js --reanudar               (borra SYNC_DETENIDO.json)
+//   docker compose exec aditec-portal node scripts/sync-manual.js --mes=2026-10            (recargar un mes)
+//   docker compose exec aditec-portal node scripts/sync-manual.js --desde=2026-01 --hasta=2026-10
+//   docker compose exec aditec-portal node scripts/sync-manual.js --pendientes             (plan automático)
+//   docker compose exec aditec-portal node scripts/sync-manual.js --estado
+//   docker compose exec aditec-portal node scripts/sync-manual.js --reanudar               (borra SYNC_DETENIDO.json)
 // Opcional: --crudo  guarda además las filas crudas en data/exploracion/crudo/ (para analizar-mes.js)
 import { config, args, salir } from './_comun.js';
 import { crearSincronizador, reanudar } from '../src/sync/scheduler.js';

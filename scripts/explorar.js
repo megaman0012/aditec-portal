@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Explora una tabla de MBA3 con pocas filas (respeta cola serial, pausa y lock).
 // Uso:
-//   docker compose exec portal node scripts/explorar.js <TABLA> [--select=A,B] [--where="..."] [--limit=3] [--guardar=nombre]
+//   docker compose exec aditec-portal node scripts/explorar.js <TABLA> [--select=A,B] [--where="..."] [--limit=3] [--guardar=nombre]
 // Ej.: node scripts/explorar.js CONT_Asiento_Detalle --where="POST_TO_DATE >= '2026-10-01'" --limit=5 --guardar=asientos-muestra
 // --guardar escribe las filas crudas en data/exploracion/<nombre>.json (no versionado).
 import fs from 'node:fs';

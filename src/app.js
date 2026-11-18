@@ -4,7 +4,7 @@
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { send, sendJson, HttpError, leerCuerpo, fechaValida, mesValido, lista, ipDe } from './http.js';
+import { send, sendJson, HttpError, leerCuerpo, fechaValida, mesValido, lista, crearIpDe } from './http.js';
 import { crearUsuarios, USUARIO_VALIDO } from './auth/users.js';
 import { crearSesiones, leerCookies, COOKIE } from './auth/sessions.js';
 import { crearRateLimit } from './auth/ratelimit.js';
@@ -14,7 +14,7 @@ import { mesesEntre } from './mba3/queries.js';
 import { hoyEn } from './sync/scheduler.js';
 import { calcular } from './calc/metrics.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 const MAX_MESES = 24;
 
 const MIME = {
@@ -38,6 +38,7 @@ export function crearApp(cfg, deps = {}) {
   const usuarios = crearUsuarios(cfg.configDir);
   const sesiones = crearSesiones({ secret: cfg.session.secret, horas: cfg.session.horas, secure: cfg.session.secure });
   const limite = deps.rateLimit ?? crearRateLimit();
+  const ipDe = crearIpDe(cfg.proxy ?? {});
 
   // --- sesión ---
   function sesionDe(req) {
