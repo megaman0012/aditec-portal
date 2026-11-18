@@ -12,7 +12,7 @@ services:
     volumes:
       # :Z = etiqueta SELinux privada (host en Enforcing)
       - ./data:/app/data:Z                 # caché + estado (lectura/escritura)
-      - ./config:/app/config:ro,Z          # configuración y usuarios (solo lectura para el portal)
+      - ./config:/app/config:Z             # configuración y usuarios (rw: el portal guarda el cambio de contraseña)
     networks:
       - aditec-net
     mem_limit: 512m

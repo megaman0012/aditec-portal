@@ -1,4 +1,4 @@
-// Usuarios del portal: config/usuarios.json = { "usuarios": [ {usuario, nombre, rol, hash, salt} ] }
+// Usuarios del portal: config/usuarios.json = { "usuarios": [ {usuario, nombre, rol, hash, salt, debe_cambiar?, clave_cambiada?} ] }
 // Se relee cuando cambia el archivo (crear un usuario no requiere reiniciar).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +27,22 @@ export function crearUsuarios(configDir) {
     return memo.mapa;
   }
 
+  // Cambia campos de un usuario (p. ej. hash/salt tras cambio de clave). Escritura atómica.
+  function actualizar(usuario, cambios) {
+    const db = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const u = (db.usuarios ?? []).find((x) => String(x.usuario).toLowerCase() === String(usuario).toLowerCase());
+    if (!u) throw new Error('Usuario no encontrado');
+    Object.assign(u, cambios);
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(db, null, 2) + '\n', { mode: 0o600 });
+    fs.renameSync(tmp, file);
+    memo = { mtimeMs: -1, mapa: new Map() };
+    return u;
+  }
+
   return {
     buscar: (usuario) => cargar().get(String(usuario ?? '').toLowerCase()) ?? null,
     cantidad: () => cargar().size,
+    actualizar,
   };
 }

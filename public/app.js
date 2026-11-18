@@ -71,6 +71,10 @@
       location.href = `/login.html?volver=${encodeURIComponent(location.pathname + location.search)}`;
       throw new Error('Sesión expirada');
     }
+    if (r.status === 403 && r.headers.get('X-Cambiar-Clave')) {
+      location.href = '/cambiar-clave.html';
+      throw new Error('Cambio de contraseña requerido');
+    }
     const cuerpo = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(cuerpo.error || `Error ${r.status}`), { status: r.status });
     return cuerpo;
@@ -640,6 +644,7 @@
     aplicarAFormulario(f);
     cargar(f, { empujarURL: false });
   });
+  $('btn-clave').addEventListener('click', () => { location.href = '/cambiar-clave.html'; });
   $('btn-salir').addEventListener('click', async () => {
     try { await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' }); } finally { location.href = '/login.html'; }
   });

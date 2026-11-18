@@ -12,7 +12,7 @@ import { crearSesiones } from '../src/auth/sessions.js';
 
 const silencio = { log() {}, warn() {}, error() {} };
 const CLAVE = 'clave-de-prueba-123';
-let base, server, cfg, recargas;
+let base, server, cfg, recargas, limitador;
 
 before(async () => {
   const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cfg-'));
@@ -42,7 +42,7 @@ before(async () => {
     umbrales: undefined, reglas: {},
   };
   const sync = { recargarMes: (mes) => { recargas.push(mes); return { encolado: mes, posicion: 1 }; }, estado: () => ({ estado: 'ok' }) };
-  server = crearApp(cfg, { sync, log: silencio, rateLimit: crearRateLimit({ maxFallos: 5 }) });
+  server = crearApp(cfg, { sync, log: silencio, rateLimit: (limitador = crearRateLimit({ maxFallos: 5 })) });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -210,4 +210,44 @@ test('IP del cliente: X-Forwarded-For solo si viene de un proxy de confianza', a
   const conProxy = crearIpDe({ confiar: true, redes: ['172.18.0.0/16'] });
   assert.equal(conProxy(req('172.18.0.9', 'falsa, 192.168.1.77')), '192.168.1.77'); // última entrada (la del proxy)
   assert.equal(conProxy(req('192.168.1.30', '10.0.0.1')), '192.168.1.30'); // no viene del proxy: XFF ignorado
+});
+
+test('clave temporal: obliga a cambiarla antes de usar el portal', async () => {
+  limitador.exito('127.0.0.1'); // la prueba de bloqueo anterior dejó esta IP bloqueada
+  const fs2 = await import('node:fs');
+  const path2 = await import('node:path');
+  const f = path2.join(cfg.configDir, 'usuarios.json');
+  const db = JSON.parse(fs2.readFileSync(f, 'utf8'));
+  db.usuarios.push({ usuario: 'nuevo', nombre: 'Nuevo', rol: 'admin', debe_cambiar: true, ...(await hashPassword('123456', { minimo: 6 })) });
+  fs2.writeFileSync(f, JSON.stringify(db));
+
+  const r = await login('nuevo', '123456');
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).debeCambiar, true);
+  const c1 = r.headers.get('set-cookie').split(';')[0];
+
+  const bloqueado = await get('/api/tablero?desde=2026-10-01&hasta=2026-10-31', c1);
+  assert.equal(bloqueado.status, 403);
+  assert.equal(bloqueado.headers.get('x-cambiar-clave'), '1');
+  assert.equal((await get('/api/me', c1)).status, 200);
+  const inicio = await get('/', c1);
+  assert.equal(inicio.status, 302);
+  assert.equal(inicio.headers.get('location'), '/cambiar-clave.html');
+
+  const cambiar = (c, actual, nueva) => fetch(`${base}/api/cambiar-clave`, { method: 'POST', headers: { Cookie: c, 'Content-Type': 'application/json' }, body: JSON.stringify({ actual, nueva }) });
+  assert.equal((await cambiar(c1, 'mala', 'Nueva-Clave-2026')).status, 400);
+  assert.equal((await cambiar(c1, '123456', 'corta')).status, 400);
+  assert.equal((await cambiar(c1, '123456', '123456')).status, 400);
+  assert.equal((await cambiar(c1, '123456', 'nuevo-nuevo-123')).status, 400); // contiene el usuario
+  const ok = await cambiar(c1, '123456', 'Rentabilidad-Q-2026');
+  assert.equal(ok.status, 200);
+  const c2 = ok.headers.get('set-cookie').split(';')[0];
+
+  assert.equal((await get('/api/tablero?desde=2026-10-01&hasta=2026-10-31', c2)).status, 200);
+  assert.equal((await get('/api/me', c1)).status, 401); // la sesión anterior queda invalidada
+  assert.equal((await login('nuevo', '123456')).status, 401); // la temporal ya no sirve
+  assert.equal((await login('nuevo', 'Rentabilidad-Q-2026')).status, 200);
+  const guardado = JSON.parse(fs2.readFileSync(f, 'utf8')).usuarios.find((u) => u.usuario === 'nuevo');
+  assert.equal(guardado.debe_cambiar, false);
+  assert.ok(!JSON.stringify(guardado).includes('Rentabilidad'));
 });

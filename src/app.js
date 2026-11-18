@@ -8,7 +8,7 @@ import { send, sendJson, HttpError, leerCuerpo, fechaValida, mesValido, lista, c
 import { crearUsuarios, USUARIO_VALIDO } from './auth/users.js';
 import { crearSesiones, leerCookies, COOKIE } from './auth/sessions.js';
 import { crearRateLimit } from './auth/ratelimit.js';
-import { verifyPassword, verificacionFalsa } from './auth/passwords.js';
+import { verifyPassword, verificacionFalsa, hashPassword, MIN_LONGITUD } from './auth/passwords.js';
 import { crearRepo } from './data/repo.js';
 import { mesesEntre } from './mba3/queries.js';
 import { hoyEn } from './sync/scheduler.js';
@@ -45,11 +45,18 @@ export function crearApp(cfg, deps = {}) {
     const s = sesiones.verificar(leerCookies(req)[COOKIE]);
     if (!s) return null;
     const u = usuarios.buscar(s.u);
-    return u ? { ...s, usuario: u.usuario, nombre: u.nombre, rol: u.rol } : null; // rol siempre desde usuarios.json
+    if (!u) return null;
+    // Una sesión emitida antes del último cambio de clave deja de valer.
+    if (u.clave_cambiada && s.iat < Date.parse(u.clave_cambiada)) return null;
+    // rol y obligación de cambiar la clave siempre desde usuarios.json
+    return { ...s, usuario: u.usuario, nombre: u.nombre, rol: u.rol, debeCambiar: u.debe_cambiar === true };
   }
-  function requerir(req, rol) {
+  function requerir(req, rol, { permitirCambioPendiente = false } = {}) {
     const s = req.sesion;
     if (!s) throw new HttpError(401, 'Sesión requerida');
+    if (s.debeCambiar && !permitirCambioPendiente) {
+      throw new HttpError(403, 'Debes cambiar tu contraseña antes de continuar', { 'X-Cambiar-Clave': '1' });
+    }
     if (rol && s.rol !== rol) throw new HttpError(403, 'Solo administradores');
     return s;
   }
@@ -182,7 +189,35 @@ export function crearApp(cfg, deps = {}) {
       }
       limite.exito(ip);
       log.log(`[auth] login OK usuario=${u.usuario} rol=${u.rol} ip=${ip}`);
-      return sendJson(res, 200, { usuario: u.usuario, nombre: u.nombre, rol: u.rol }, { 'Set-Cookie': sesiones.cookieLogin(sesiones.emitir(u.usuario)) });
+      return sendJson(res, 200, { usuario: u.usuario, nombre: u.nombre, rol: u.rol, debeCambiar: u.debe_cambiar === true },
+        { 'Set-Cookie': sesiones.cookieLogin(sesiones.emitir(u.usuario)) });
+    }
+
+    if (pathname === '/api/cambiar-clave' && m === 'POST') {
+      const s = requerir(req, null, { permitirCambioPendiente: true });
+      const ip = ipDe(req);
+      const espera = limite.bloqueado(ip);
+      if (espera) throw new HttpError(429, 'Demasiados intentos. Intenta más tarde.', { 'Retry-After': String(Math.ceil(espera / 1000)) });
+      const body = await leerCuerpo(req);
+      const actual = String(body.actual ?? '');
+      const nueva = String(body.nueva ?? '');
+      const u = usuarios.buscar(s.usuario);
+      if (!u || !(await verifyPassword(actual, u))) {
+        limite.fallo(ip);
+        log.warn(`[auth] cambio de clave FALLIDO (clave actual incorrecta) usuario=${s.usuario} ip=${ip}`);
+        throw new HttpError(400, 'La contraseña actual no es correcta');
+      }
+      if (nueva.length < MIN_LONGITUD) throw new HttpError(400, `La nueva contraseña debe tener al menos ${MIN_LONGITUD} caracteres`);
+      if (nueva === actual) throw new HttpError(400, 'La nueva contraseña debe ser distinta de la actual');
+      if (nueva.toLowerCase().includes(s.usuario.toLowerCase())) throw new HttpError(400, 'La contraseña no puede contener el nombre de usuario');
+      if (/^(.)\1+$/.test(nueva) || /^(0123456789|1234567890|123456789|qwertyuiop)/i.test(nueva)) throw new HttpError(400, 'La contraseña es demasiado fácil de adivinar');
+      const cred = await hashPassword(nueva);
+      const ahora = new Date();
+      usuarios.actualizar(s.usuario, { ...cred, debe_cambiar: false, clave_cambiada: ahora.toISOString() });
+      limite.exito(ip);
+      log.log(`[auth] cambio de clave OK usuario=${s.usuario} ip=${ip}`);
+      // Nueva cookie (las sesiones anteriores de este usuario quedan invalidadas).
+      return sendJson(res, 200, { ok: true }, { 'Set-Cookie': sesiones.cookieLogin(sesiones.emitir(s.usuario)) });
     }
 
     if (pathname === '/api/logout' && m === 'POST') {
@@ -193,8 +228,8 @@ export function crearApp(cfg, deps = {}) {
     if (m !== 'GET' && !(m === 'POST' && pathname === '/api/admin/recargar')) throw new HttpError(405, 'Método no permitido');
 
     if (pathname === '/api/me') {
-      const s = requerir(req);
-      return sendJson(res, 200, { usuario: s.usuario, nombre: s.nombre, rol: s.rol, expira: new Date(s.exp).toISOString() });
+      const s = requerir(req, null, { permitirCambioPendiente: true });
+      return sendJson(res, 200, { usuario: s.usuario, nombre: s.nombre, rol: s.rol, debeCambiar: s.debeCambiar, expira: new Date(s.exp).toISOString() });
     }
     if (pathname === '/api/filtros') {
       requerir(req);
@@ -237,7 +272,14 @@ export function crearApp(cfg, deps = {}) {
       return send(res, 302, '', 'text/plain; charset=utf-8', { Location: `/login.html${volver}` });
     }
     if (pathname === '/login.html' && req.sesion) {
-      return send(res, 302, '', 'text/plain; charset=utf-8', { Location: '/' });
+      return send(res, 302, '', 'text/plain; charset=utf-8', { Location: req.sesion.debeCambiar ? '/cambiar-clave.html' : '/' });
+    }
+    // Con clave temporal, la única página permitida es la de cambio de clave.
+    if ((pathname === '/' || pathname === '/index.html') && req.sesion?.debeCambiar) {
+      return send(res, 302, '', 'text/plain; charset=utf-8', { Location: '/cambiar-clave.html' });
+    }
+    if (pathname === '/cambiar-clave.html' && !req.sesion) {
+      return send(res, 302, '', 'text/plain; charset=utf-8', { Location: '/login.html' });
     }
     const root = path.resolve(cfg.publicDir);
     let rel;

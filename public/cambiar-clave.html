@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal ADITEC — Cambiar contraseña</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="pagina-login">
+  <main class="login-caja">
+    <form class="login-tarjeta" id="form-clave" autocomplete="off" novalidate>
+      <img src="/img/logo.svg" alt="ADITEC" class="login-logo">
+      <h1>Cambiar contraseña</h1>
+      <p class="sub" id="motivo">Elige una contraseña nueva para tu usuario.</p>
+      <p class="aviso-clave" id="aviso-temporal" hidden>Tu contraseña es temporal. Debes cambiarla antes de usar el portal.</p>
+      <label class="campo">Contraseña actual
+        <input type="password" id="actual" autocomplete="current-password" required>
+      </label>
+      <label class="campo">Nueva contraseña
+        <input type="password" id="nueva" autocomplete="new-password" minlength="10" required>
+      </label>
+      <label class="campo">Repite la nueva contraseña
+        <input type="password" id="nueva2" autocomplete="new-password" minlength="10" required>
+      </label>
+      <ul class="reglas-clave muted">
+        <li>Mínimo 10 caracteres.</li>
+        <li>Distinta de la actual y sin tu nombre de usuario.</li>
+        <li>Recomendado: una frase corta con números, p. ej. «Cobranza-Quito-2026».</li>
+      </ul>
+      <p class="login-error" id="error" role="alert" hidden></p>
+      <button type="submit" class="boton primario" id="btn-guardar">Guardar contraseña</button>
+      <button type="button" class="boton secundario" id="btn-salir">Salir</button>
+    </form>
+  </main>
+  <script src="/cambiar-clave.js"></script>
+</body>
+</html>

@@ -11,9 +11,10 @@ function scrypt(plain, salt) {
     crypto.scrypt(String(plain), salt, KEYLEN, PARAMS, (err, key) => (err ? reject(err) : resolve(key))));
 }
 
-export async function hashPassword(plain) {
-  if (typeof plain !== 'string' || plain.length < MIN_LONGITUD) {
-    throw new Error(`La contraseña debe tener al menos ${MIN_LONGITUD} caracteres`);
+// `minimo` solo se baja para claves TEMPORALES que el usuario debe cambiar al primer ingreso.
+export async function hashPassword(plain, { minimo = MIN_LONGITUD } = {}) {
+  if (typeof plain !== 'string' || plain.length < minimo) {
+    throw new Error(`La contraseña debe tener al menos ${minimo} caracteres`);
   }
   const salt = crypto.randomBytes(16);
   const key = await scrypt(plain, salt);

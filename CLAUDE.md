@@ -63,7 +63,9 @@ Ubicación: `/home/aditec/Documentos/dt360crm/aditec-portal`. Servidor `192.168.
 - Un mes completo ≈ 4–10 peticiones y 10–30 s.
 
 ## Autenticación y API (Fase 6)
-- usuarios.json {usuario, nombre, rol admin|gerencia, hash, salt} (scrypt asíncrono); se relee sin reinicio.
+- usuarios.json {usuario, nombre, rol admin|gerencia, hash, salt, debe_cambiar?, clave_cambiada?} (scrypt asíncrono);
+  se relee sin reinicio. debe_cambiar=true -> solo /api/me, /api/cambiar-clave, logout y cambiar-clave.html
+  (403 + X-Cambiar-Clave). Sesiones con iat < clave_cambiada se invalidan. Usuario inicial `admin` con clave temporal.
 - Cookie `aditec_sid` HttpOnly, SameSite=Strict, HMAC-SHA256, SESSION_HORAS; Secure con COOKIE_SECURE=true.
   El rol se lee de usuarios.json en cada petición; logout revoca el jti (en memoria).
 - Rate limit login 5 fallos/IP/15 min -> 429 15 min. POST con Origin ajeno -> 403. `/` sin sesión -> 302 login.
@@ -79,7 +81,7 @@ Ubicación: `/home/aditec/Documentos/dt360crm/aditec-portal`. Servidor `192.168.
 ## Publicación (Fase 8)
 - Imagen sin npm install, TZ America/Guayaquil (Node usa ICU; `date` de busybox muestra UTC), usuario node,
   código root:root, rootfs read-only, cap_drop ALL, mem 512m (heap 384m), logs json-file 10m×3.
-- data/ rw, config/ **ro** (usuarios con contenedor aparte). Sin Cross-Origin-Opener-Policy (Chrome la
+- data/ rw, config/ **rw** (el portal escribe usuarios.json al cambiar claves; antes era ro). Sin Cross-Origin-Opener-Policy (Chrome la
   ignora con error fuera de HTTPS).
 - Firewall: 8090/tcp solo 192.168.1.0/24 (`ops/firewall-8090.sh`). Proxy inverso preparado (comentado en
   compose + `ops/proxy-ejemplo.md`); TRUST_PROXY + TRUSTED_PROXY_IPS para IP real del cliente.
@@ -90,7 +92,7 @@ Ubicación: `/home/aditec/Documentos/dt360crm/aditec-portal`. Servidor `192.168.
 ## Comandos
 - `docker compose up -d --build` · `docker compose logs -f aditec-portal` · `curl localhost:8090/health`
 - Tests: `docker run --rm -v "$PWD":/app:Z -w /app node:20-alpine node --test test/`
-- Usuario: `docker run --rm -it --user 1000:1000 -v "$PWD":/app:Z -w /app node:20-alpine node scripts/crear-usuario.js <usuario> "<Nombre>" admin|gerencia`
+- Usuario: `docker compose exec -it aditec-portal node scripts/crear-usuario.js <usuario> "<Nombre>" admin|gerencia [--temporal]`
 - Sync: `docker compose exec aditec-portal node scripts/sync-manual.js --mes=AAAA-MM | --estado | --reanudar`
 - Dev: `docker run --rm -it -p 127.0.0.1:8091:8091 -v "$PWD":/app:ro,Z -w /app node:20-alpine node scripts/dev.js`
 - Chart.js v4.4.7 sha256 `2812cb8825fdc57469eb2f7bb055e9429244e599920511ee477e828499b632cb`.

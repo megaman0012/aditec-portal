@@ -67,7 +67,7 @@ Se excluyen facturas anuladas y documentos distintos de `FACT`.
 | `src/calc/` | `agregar.js` (crudo → agregado) y `metrics.js` (fórmulas, semáforo, gastos) |
 | `src/data/repo.js` | Lectura de caché + comparativo año anterior |
 | `public/` | `login.html`, `index.html`, `app.js`, `styles.css`, `vendor/chart.umd.min.js` |
-| `config/` | `vendedores.json`, `gastos.json`, `umbrales.json`, `reglas.json`, `usuarios.json` (no versionado) |
+| `config/` | `vendedores.json`, `gastos.json`, `umbrales.json`, `reglas.json`, `usuarios.json` (no versionado; el portal lo escribe al cambiar claves) |
 | `data/` | Caché y estado (no versionado) |
 | `scripts/` | Operación y diagnóstico (ver abajo) |
 | `ops/` | IP fija, firewall, ejemplo de proxy inverso |
@@ -88,13 +88,14 @@ curl http://192.168.1.50:8090/health  # salud
 Acceso: **http://192.168.1.50:8090** (solo red 192.168.1.0/24).
 
 ### Crear o cambiar un usuario
-`config/` está montado de solo lectura en el portal, así que se usa un contenedor aparte.
-La clave se pide oculta (mínimo 10 caracteres); no hace falta reiniciar.
+La clave se pide oculta; no hace falta reiniciar. Con `--temporal` la clave es provisional (mín. 6) y el
+portal obliga a cambiarla en el primer ingreso (solo deja ver la página "Cambiar contraseña").
 ```bash
-docker run --rm -it --user 1000:1000 -v "$PWD":/app:Z -w /app node:20-alpine \
-  node scripts/crear-usuario.js <usuario> "<Nombre visible>" admin|gerencia
+docker compose exec -it aditec-portal node scripts/crear-usuario.js <usuario> "<Nombre visible>" admin|gerencia [--temporal]
 ```
-Para quitar un usuario, borrar su entrada de `config/usuarios.json`.
+Cada usuario puede cambiar su clave desde el botón **Cambiar contraseña** del tablero (mín. 10 caracteres);
+al cambiarla se cierran sus otras sesiones. Para quitar un usuario, borrar su entrada de `config/usuarios.json`.
+Usuario inicial: `admin` (clave temporal, cambio obligatorio en el primer ingreso).
 
 ### Recargar un mes desde MBA3
 - Web (rol admin): botón **⟳ Recargar mes** (recarga el mes de la fecha "Hasta").

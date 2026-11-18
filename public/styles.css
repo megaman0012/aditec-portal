@@ -224,3 +224,7 @@ body.cargando .tabla-tarjeta { opacity: .5; }
   .centro-totales { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .multi-lista input[type="checkbox"] { min-height: 0; padding: 0; width: 15px; height: 15px; margin: 0; }
+
+/* cambio de contraseña */
+.aviso-clave { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--sem-amarillo-bg); color: var(--sem-amarillo); font-size: .9rem; }
+.reglas-clave { margin: 0; padding-left: 18px; font-size: .82rem; }

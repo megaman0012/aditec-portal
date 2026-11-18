@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 // Crea o actualiza un usuario del portal en config/usuarios.json (scrypt: hash + salt; nunca texto plano).
-// La contraseña se pide por consola SIN mostrarla. Uso:
-//   node scripts/crear-usuario.js <usuario> "<Nombre visible>" <admin|gerencia>
-// En el servidor (config/ está montado solo-lectura en el contenedor del portal):
-//   docker run --rm -it --user 1000:1000 -v "$PWD":/app:Z -w /app node:20-alpine \
-//     node scripts/crear-usuario.js <usuario> "<Nombre>" admin
+// La contraseña se pide por consola SIN mostrarla. Uso en el servidor:
+//   docker compose exec -it aditec-portal node scripts/crear-usuario.js <usuario> "<Nombre>" <admin|gerencia> [--temporal]
+// --temporal: clave provisional (mín. 6) que el usuario DEBE cambiar en su primer ingreso.
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { hashPassword, MIN_LONGITUD } from '../src/auth/passwords.js';
 import { ROLES, USUARIO_VALIDO } from '../src/auth/users.js';
 
-const [usuarioArg, nombre, rol] = process.argv.slice(2);
+const temporal = process.argv.includes('--temporal');
+const [usuarioArg, nombre, rol] = process.argv.slice(2).filter((a) => a !== '--temporal');
 const usuario = String(usuarioArg ?? '').toLowerCase();
 if (!USUARIO_VALIDO.test(usuario) || !nombre || !ROLES.includes(rol)) {
   console.error(`Uso: node scripts/crear-usuario.js <usuario> "<Nombre visible>" <${ROLES.join('|')}>`);
@@ -32,18 +31,19 @@ function preguntarOculto(texto) {
   });
 }
 
-const pwd = await preguntarOculto(`Contraseña (mín. ${MIN_LONGITUD}): `);
+const minimo = temporal ? 6 : MIN_LONGITUD;
+const pwd = await preguntarOculto(`Contraseña${temporal ? ' temporal' : ''} (mín. ${minimo}): `);
 const pwd2 = await preguntarOculto('Repite la contraseña: ');
 if (pwd !== pwd2) { console.error('Las contraseñas no coinciden'); process.exit(1); }
 
 let cred;
-try { cred = await hashPassword(pwd); } catch (e) { console.error(e.message); process.exit(1); }
+try { cred = await hashPassword(pwd, { minimo }); } catch (e) { console.error(e.message); process.exit(1); }
 
 const file = path.join(process.env.CONFIG_DIR || new URL('../config/', import.meta.url).pathname, 'usuarios.json');
 const db = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : { usuarios: [] };
 db.usuarios ??= [];
 const existente = db.usuarios.find((u) => String(u.usuario).toLowerCase() === usuario);
-const registro = { usuario, nombre, rol, ...cred, actualizado: new Date().toISOString() };
+const registro = { usuario, nombre, rol, ...cred, debe_cambiar: temporal, actualizado: new Date().toISOString() };
 if (existente) {
   for (const k of Object.keys(existente)) delete existente[k];
   Object.assign(existente, registro);
@@ -54,4 +54,4 @@ if (existente) {
 const tmp = `${file}.tmp`;
 fs.writeFileSync(tmp, JSON.stringify(db, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(tmp, file);
-console.log(`Usuario "${usuario}" ${existente ? 'actualizado' : 'creado'} (${rol}). Ya puede ingresar (no hace falta reiniciar).`);
+console.log(`Usuario "${usuario}" ${existente ? 'actualizado' : 'creado'} (${rol})${temporal ? ' con clave temporal: deberá cambiarla al ingresar' : ''}. No hace falta reiniciar.`);

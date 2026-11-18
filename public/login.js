@@ -26,7 +26,8 @@
         credentials: 'same-origin',
       });
       if (r.ok) {
-        await r.json().catch(() => null); // consumir la respuesta antes de navegar
+        const datos = await r.json().catch(() => ({})); // consumir la respuesta antes de navegar
+        if (datos.debeCambiar) { location.href = '/cambiar-clave.html'; return; }
         const destino = new URLSearchParams(location.search).get('volver');
         location.href = destino && destino.startsWith('/?') ? destino : '/';
         return;
